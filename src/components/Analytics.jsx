@@ -4,8 +4,8 @@ import { exportAsCSV, exportAsPDF } from "../utils/exportResults";
 
 export default function Analytics({
   answers, overallAccuracy, avgTimePerQ, ncertAccuracy, ncertAnswers,
-  totalTimer, conceptStats, formatTime, getMistakePatterns, getWrongQuestions,
-  setScreen, openFlashcards, history
+  unansweredCount, totalTimer, conceptStats, formatTime, getMistakePatterns,
+  getWrongQuestions, setScreen, openFlashcards, history
 }) {
   const mistakes = getMistakePatterns();
   const wrongQs = getWrongQuestions();
@@ -98,11 +98,25 @@ export default function Analytics({
             <span style={{ fontSize: 12, color: "#9ca3af" }}>
               {answers.filter(a => a.isCorrect).length}/{answers.length} correct
             </span>
+            {unansweredCount > 0 && (
+              <span style={{ fontSize: 11, color: "#d97706" }}>
+                {unansweredCount} not answered
+              </span>
+            )}
           </div>
           <div style={S.statCard}>
             <span style={S.statLabel}>Total Time</span>
             <span style={S.statValue}>{formatTime(totalTimer)}</span>
             <span style={{ fontSize: 12, color: "#9ca3af" }}>{avgTimePerQ}s avg per Q</span>
+          </div>
+          <div style={S.statCard}>
+            <span style={S.statLabel}>Not Answered</span>
+            <span style={{ ...S.statValue, color: unansweredCount > 0 ? "#d97706" : "#059669" }}>
+              {unansweredCount}
+            </span>
+            <span style={{ fontSize: 12, color: "#9ca3af" }}>
+              of {answers.length} questions
+            </span>
           </div>
           <div style={S.statCard}>
             <span style={S.statLabel}>NCERT Trap Accuracy</span>

@@ -10,9 +10,7 @@ function App() {
   const quiz = useQuiz();
 
   if (quiz.screen === "dashboard") {
-    return (
-      <Dashboard startQuiz={quiz.startQuiz} />
-    );
+    return <Dashboard startQuiz={quiz.startQuiz} />;
   }
 
   if (quiz.screen === "quiz") {
@@ -20,10 +18,17 @@ function App() {
       <Quiz
         quizQuestions={quiz.quizQuestions}
         currentIdx={quiz.currentIdx}
-        selected={quiz.selected}
+        userAnswers={quiz.userAnswers}
+        markedForReview={quiz.markedForReview}
         questionTimer={quiz.questionTimer}
+        totalTimer={quiz.totalTimer}
         handleSelect={quiz.handleSelect}
-        submitAnswer={quiz.submitAnswer}
+        clearResponse={quiz.clearResponse}
+        toggleMarkForReview={quiz.toggleMarkForReview}
+        goToQuestion={quiz.goToQuestion}
+        prevQuestion={quiz.prevQuestion}
+        nextQuestion={quiz.nextQuestion}
+        finishQuiz={quiz.finishQuiz}
         exitQuiz={quiz.exitQuiz}
         formatTime={quiz.formatTime}
       />
@@ -38,6 +43,7 @@ function App() {
         avgTimePerQ={quiz.avgTimePerQ}
         ncertAccuracy={quiz.ncertAccuracy}
         ncertAnswers={quiz.ncertAnswers}
+        unansweredCount={quiz.unansweredCount}
         totalTimer={quiz.totalTimer}
         conceptStats={quiz.conceptStats}
         formatTime={quiz.formatTime}
@@ -51,12 +57,7 @@ function App() {
   }
 
   if (quiz.screen === "review") {
-    return (
-      <AnswerReview
-        answers={quiz.answers}
-        setScreen={quiz.setScreen}
-      />
-    );
+    return <AnswerReview answers={quiz.answers} setScreen={quiz.setScreen} />;
   }
 
   if (quiz.screen === "history") {
@@ -74,6 +75,7 @@ function App() {
     return (
       <Flashcards
         getWrongQuestions={quiz.getWrongQuestions}
+        getReviewQuestions={quiz.getReviewQuestions}
         flashcardIdx={quiz.flashcardIdx}
         setFlashcardIdx={quiz.setFlashcardIdx}
         flashcardFlipped={quiz.flashcardFlipped}

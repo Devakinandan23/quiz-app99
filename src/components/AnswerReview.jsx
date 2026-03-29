@@ -3,7 +3,7 @@ import { S } from "../styles/styles";
 import { QUESTIONS, DIFF_MAP } from "../data/questions";
 
 export default function AnswerReview({ answers, setScreen }) {
-  const [filter, setFilter] = useState("all"); // all, correct, wrong
+  const [filter, setFilter] = useState("all");
 
   const enriched = answers.map(a => {
     const q = QUESTIONS.find(question => question.id === a.qId);
@@ -14,10 +14,13 @@ export default function AnswerReview({ answers, setScreen }) {
     ? enriched
     : filter === "correct"
       ? enriched.filter(a => a.isCorrect)
-      : enriched.filter(a => !a.isCorrect);
+      : filter === "wrong"
+        ? enriched.filter(a => !a.isCorrect && !a.isUnanswered)
+        : enriched.filter(a => a.isUnanswered);
 
   const correctCount = enriched.filter(a => a.isCorrect).length;
-  const wrongCount = enriched.filter(a => !a.isCorrect).length;
+  const wrongCount = enriched.filter(a => !a.isCorrect && !a.isUnanswered).length;
+  const unansweredCount = enriched.filter(a => a.isUnanswered).length;
 
   return (
     <div style={S.page}>
@@ -63,6 +66,17 @@ export default function AnswerReview({ answers, setScreen }) {
           >
             Wrong ({wrongCount})
           </button>
+          <button
+            onClick={() => setFilter("unanswered")}
+            style={{
+              ...S.secondaryBtn,
+              background: filter === "unanswered" ? "#d97706" : "#fff",
+              color: filter === "unanswered" ? "#fff" : "#d97706",
+              borderColor: "#d97706",
+            }}
+          >
+            Not Answered ({unansweredCount})
+          </button>
         </div>
 
         {filtered.length === 0 && (
@@ -71,26 +85,27 @@ export default function AnswerReview({ answers, setScreen }) {
           </p>
         )}
 
-        {filtered.map((a, idx) => {
+        {filtered.map((a) => {
           const q = a.question;
+          const borderColor = a.isUnanswered ? "#fef3c7" : a.isCorrect ? "#d1fae5" : "#fecaca";
+          const iconBg = a.isUnanswered ? "#fffbeb" : a.isCorrect ? "#ecfdf5" : "#fef2f2";
+          const iconColor = a.isUnanswered ? "#d97706" : a.isCorrect ? "#059669" : "#dc2626";
+          const icon = a.isUnanswered ? "—" : a.isCorrect ? "\u2713" : "\u2717";
+
           return (
             <div key={q.id} style={{
               background: "#fff",
-              border: `1.5px solid ${a.isCorrect ? "#d1fae5" : "#fecaca"}`,
-              borderRadius: 12,
-              padding: 18,
-              marginBottom: 14,
+              border: `1.5px solid ${borderColor}`,
+              borderRadius: 12, padding: 18, marginBottom: 14,
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{
                     width: 28, height: 28, borderRadius: "50%",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 13, fontWeight: 700,
-                    background: a.isCorrect ? "#ecfdf5" : "#fef2f2",
-                    color: a.isCorrect ? "#059669" : "#dc2626",
+                    fontSize: 13, fontWeight: 700, background: iconBg, color: iconColor,
                   }}>
-                    {a.isCorrect ? "\u2713" : "\u2717"}
+                    {icon}
                   </span>
                   <span style={{ fontSize: 12, color: "#6b7280" }}>Q{q.id}</span>
                   <span style={{
@@ -131,14 +146,24 @@ export default function AnswerReview({ answers, setScreen }) {
                       background: bg, border: `1.5px solid ${border}`, borderRadius: 8,
                       color, fontWeight: fw, display: "flex", alignItems: "center", gap: 8,
                     }}>
-                      <span style={{ fontWeight: 600, opacity: 0.4, minWidth: 18 }}>
-                        {String.fromCharCode(65 + i)}
+                      {/* Radio circle indicator */}
+                      <span style={{
+                        width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
+                        border: `2px solid ${isCorrectOpt ? "#059669" : isUserPick ? "#dc2626" : "#d1d5db"}`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        {(isCorrectOpt || isUserPick) && (
+                          <span style={{
+                            width: 10, height: 10, borderRadius: "50%",
+                            background: isCorrectOpt ? "#059669" : "#dc2626",
+                          }} />
+                        )}
                       </span>
                       <span style={{ flex: 1 }}>{opt}</span>
                       {isCorrectOpt && (
                         <span style={{ fontSize: 11, fontWeight: 600, color: "#059669" }}>CORRECT</span>
                       )}
-                      {isUserPick && !a.isCorrect && (
+                      {isUserPick && !a.isCorrect && !a.isUnanswered && (
                         <span style={{ fontSize: 11, fontWeight: 600, color: "#dc2626" }}>YOUR ANSWER</span>
                       )}
                       {isUserPick && a.isCorrect && (
@@ -150,7 +175,7 @@ export default function AnswerReview({ answers, setScreen }) {
               </div>
 
               <div style={{
-                background: a.isCorrect ? "#f0fdf4" : "#fefce8",
+                background: a.isUnanswered ? "#fffbeb" : a.isCorrect ? "#f0fdf4" : "#fefce8",
                 borderRadius: 8, padding: 12,
               }}>
                 <p style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 4 }}>Explanation</p>

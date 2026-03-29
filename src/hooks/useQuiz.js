@@ -20,8 +20,6 @@ export function useQuiz() {
   const [screen, setScreen] = useState("dashboard");
   const [answers, setAnswers] = useState([]);
   const [currentIdx, setCurrentIdx] = useState(0);
-  const [selected, setSelected] = useState(null);
-  const [showFeedback, setShowFeedback] = useState(false);
   const [quizDone, setQuizDone] = useState(false);
   const [questionTimer, setQuestionTimer] = useState(0);
   const [totalTimer, setTotalTimer] = useState(0);
@@ -30,6 +28,12 @@ export function useQuiz() {
   const [flashcardFlipped, setFlashcardFlipped] = useState(false);
   const [quizQuestions, setQuizQuestions] = useState(QUESTIONS);
   const [history, setHistory] = useState(loadHistory);
+
+  // Exam-style state
+  const [userAnswers, setUserAnswers] = useState({}); // { questionIndex: selectedOptionIndex }
+  const [markedForReview, setMarkedForReview] = useState(new Set());
+  const [questionTimes, setQuestionTimes] = useState({}); // { questionIndex: seconds }
+
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -41,6 +45,14 @@ export function useQuiz() {
     }
     return () => clearInterval(timerRef.current);
   }, [quizActive, currentIdx]);
+
+  // Save time when navigating away from a question
+  const saveCurrentQuestionTime = () => {
+    setQuestionTimes(prev => ({
+      ...prev,
+      [currentIdx]: (prev[currentIdx] || 0) + questionTimer,
+    }));
+  };
 
   const saveAttempt = (finalAnswers, finalTotalTimer) => {
     const correct = finalAnswers.filter(a => a.isCorrect).length;
@@ -68,8 +80,9 @@ export function useQuiz() {
     setQuizQuestions(filtered);
     setAnswers([]);
     setCurrentIdx(0);
-    setSelected(null);
-    setShowFeedback(false);
+    setUserAnswers({});
+    setMarkedForReview(new Set());
+    setQuestionTimes({});
     setQuizDone(false);
     setQuestionTimer(0);
     setTotalTimer(0);
@@ -78,62 +91,87 @@ export function useQuiz() {
   };
 
   const handleSelect = (optIdx) => {
-    setSelected(optIdx);
+    setUserAnswers(prev => ({ ...prev, [currentIdx]: optIdx }));
   };
 
-  const submitAnswer = () => {
-    if (selected === null) return;
-    clearInterval(timerRef.current);
-    const q = quizQuestions[currentIdx];
-    const newAnswer = {
-      qId: q.id, selected, correct: q.ans,
-      isCorrect: selected === q.ans, time: questionTimer,
-      concept: q.concept, diff: q.diff, ncert: q.ncert
-    };
-    const updatedAnswers = [...answers, newAnswer];
-    setAnswers(updatedAnswers);
+  const clearResponse = () => {
+    setUserAnswers(prev => {
+      const next = { ...prev };
+      delete next[currentIdx];
+      return next;
+    });
+  };
 
-    if (currentIdx + 1 >= quizQuestions.length) {
-      setQuizDone(true);
-      setQuizActive(false);
-      saveAttempt(updatedAnswers, totalTimer + questionTimer);
-      setScreen("analytics");
-    } else {
-      setCurrentIdx(i => i + 1);
-      setSelected(null);
-      setQuestionTimer(0);
-    }
+  const toggleMarkForReview = () => {
+    setMarkedForReview(prev => {
+      const next = new Set(prev);
+      if (next.has(currentIdx)) next.delete(currentIdx);
+      else next.add(currentIdx);
+      return next;
+    });
+  };
+
+  const goToQuestion = (idx) => {
+    if (idx < 0 || idx >= quizQuestions.length) return;
+    saveCurrentQuestionTime();
+    setCurrentIdx(idx);
+    setQuestionTimer(0);
+  };
+
+  const prevQuestion = () => {
+    if (currentIdx > 0) goToQuestion(currentIdx - 1);
   };
 
   const nextQuestion = () => {
-    if (currentIdx + 1 >= quizQuestions.length) {
-      setQuizDone(true);
-      setQuizActive(false);
-      setScreen("analytics");
-      return;
-    }
-    setCurrentIdx(i => i + 1);
-    setSelected(null);
-    setShowFeedback(false);
-    setQuestionTimer(0);
+    if (currentIdx < quizQuestions.length - 1) goToQuestion(currentIdx + 1);
+  };
+
+  const finishQuiz = () => {
+    clearInterval(timerRef.current);
+    saveCurrentQuestionTime();
+
+    // Build final answers array from userAnswers
+    const finalTimes = { ...questionTimes, [currentIdx]: (questionTimes[currentIdx] || 0) + questionTimer };
+    const finalAnswers = quizQuestions.map((q, idx) => {
+      const selected = userAnswers[idx] ?? null;
+      return {
+        qId: q.id,
+        selected,
+        correct: q.ans,
+        isCorrect: selected === q.ans,
+        isUnanswered: selected === null,
+        time: finalTimes[idx] || 0,
+        concept: q.concept,
+        diff: q.diff,
+        ncert: q.ncert,
+      };
+    });
+
+    setAnswers(finalAnswers);
+    setQuizDone(true);
+    setQuizActive(false);
+    saveAttempt(finalAnswers, totalTimer);
+    setScreen("analytics");
   };
 
   const getConceptStats = () => {
     const stats = {};
     answers.forEach(a => {
-      if (!stats[a.concept]) stats[a.concept] = { total: 0, correct: 0, totalTime: 0 };
+      if (!stats[a.concept]) stats[a.concept] = { total: 0, correct: 0, totalTime: 0, unanswered: 0 };
       stats[a.concept].total++;
       if (a.isCorrect) stats[a.concept].correct++;
+      if (a.isUnanswered) stats[a.concept].unanswered++;
       stats[a.concept].totalTime += a.time;
     });
     return Object.entries(stats).map(([concept, s]) => ({
       concept, accuracy: Math.round((s.correct / s.total) * 100),
-      total: s.total, correct: s.correct, avgTime: Math.round(s.totalTime / s.total)
+      total: s.total, correct: s.correct, unanswered: s.unanswered,
+      avgTime: Math.round(s.totalTime / s.total)
     })).sort((a, b) => a.accuracy - b.accuracy);
   };
 
   const getMistakePatterns = () => {
-    const wrong = answers.filter(a => !a.isCorrect);
+    const wrong = answers.filter(a => !a.isCorrect && !a.isUnanswered);
     const avgTime = answers.length ? answers.reduce((s, a) => s + a.time, 0) / answers.length : 15;
     const guessing = wrong.filter(a => a.time < avgTime * 0.5).length;
     const confusion = wrong.filter(a => a.time >= avgTime * 0.5).length;
@@ -141,13 +179,28 @@ export function useQuiz() {
   };
 
   const getWrongQuestions = () => {
-    return answers.filter(a => !a.isCorrect).map(a => QUESTIONS.find(q => q.id === a.qId)).filter(Boolean);
+    return answers.filter(a => !a.isCorrect && !a.isUnanswered).map(a => QUESTIONS.find(q => q.id === a.qId)).filter(Boolean);
+  };
+
+  const getUnansweredQuestions = () => {
+    return answers.filter(a => a.isUnanswered).map(a => QUESTIONS.find(q => q.id === a.qId)).filter(Boolean);
+  };
+
+  const getReviewQuestions = (filter) => {
+    if (filter === "wrong") return getWrongQuestions();
+    if (filter === "unanswered") return getUnansweredQuestions();
+    // "all" = wrong + unanswered
+    return answers.filter(a => !a.isCorrect).map(a => {
+      const q = QUESTIONS.find(qq => qq.id === a.qId);
+      return q ? { ...q, _isUnanswered: a.isUnanswered } : null;
+    }).filter(Boolean);
   };
 
   const overallAccuracy = answers.length ? Math.round(answers.filter(a => a.isCorrect).length / answers.length * 100) : 0;
   const avgTimePerQ = answers.length ? Math.round(answers.reduce((s, a) => s + a.time, 0) / answers.length) : 0;
   const ncertAnswers = answers.filter(a => a.ncert);
   const ncertAccuracy = ncertAnswers.length ? Math.round(ncertAnswers.filter(a => a.isCorrect).length / ncertAnswers.length * 100) : 0;
+  const unansweredCount = answers.filter(a => a.isUnanswered).length;
 
   const conceptStats = getConceptStats();
   const weakest = conceptStats.length ? conceptStats[0] : null;
@@ -161,8 +214,9 @@ export function useQuiz() {
     setQuizQuestions(wrongQs);
     setAnswers([]);
     setCurrentIdx(0);
-    setSelected(null);
-    setShowFeedback(false);
+    setUserAnswers({});
+    setMarkedForReview(new Set());
+    setQuestionTimes({});
     setQuizDone(false);
     setQuestionTimer(0);
     setTotalTimer(0);
@@ -176,13 +230,14 @@ export function useQuiz() {
     setScreen("flashcards");
   };
 
-  // Exit quiz = discard current attempt (no save)
   const exitQuiz = () => {
     clearInterval(timerRef.current);
     setQuizActive(false);
     setAnswers([]);
     setCurrentIdx(0);
-    setSelected(null);
+    setUserAnswers({});
+    setMarkedForReview(new Set());
+    setQuestionTimes({});
     setQuestionTimer(0);
     setTotalTimer(0);
     setScreen("dashboard");
@@ -192,11 +247,16 @@ export function useQuiz() {
   useEffect(() => {
     if (import.meta.env.DEV) {
       window.__devSkip = () => {
-        const fakeAnswers = QUESTIONS.map(q => ({
-          qId: q.id, selected: Math.floor(Math.random() * 4), correct: q.ans,
-          isCorrect: Math.random() > 0.4, time: Math.floor(Math.random() * 30) + 3,
-          concept: q.concept, diff: q.diff, ncert: q.ncert,
-        }));
+        const fakeAnswers = QUESTIONS.map(q => {
+          const skip = Math.random() > 0.85;
+          const sel = skip ? null : Math.floor(Math.random() * 4);
+          return {
+            qId: q.id, selected: sel, correct: q.ans,
+            isCorrect: sel === q.ans, isUnanswered: skip,
+            time: Math.floor(Math.random() * 30) + 3,
+            concept: q.concept, diff: q.diff, ncert: q.ncert,
+          };
+        });
         setAnswers(fakeAnswers);
         setTotalTimer(420);
         setScreen("analytics");
@@ -204,7 +264,6 @@ export function useQuiz() {
     }
   }, []);
 
-  // Load a past attempt to view its results
   const viewAttempt = (attempt) => {
     setAnswers(attempt.answers);
     setTotalTimer(attempt.totalTime);
@@ -213,15 +272,19 @@ export function useQuiz() {
 
   return {
     screen, setScreen,
-    answers, currentIdx, selected, showFeedback,
-    quizDone, questionTimer, totalTimer, quizActive,
+    answers, currentIdx, quizDone,
+    questionTimer, totalTimer, quizActive,
     flashcardIdx, setFlashcardIdx,
     flashcardFlipped, setFlashcardFlipped,
     quizQuestions,
+    userAnswers, markedForReview,
     history, clearHistory, viewAttempt,
-    startQuiz, handleSelect, submitAnswer, nextQuestion,
-    getConceptStats, getMistakePatterns, getWrongQuestions,
+    startQuiz, handleSelect, clearResponse,
+    toggleMarkForReview, goToQuestion,
+    prevQuestion, nextQuestion, finishQuiz,
+    getConceptStats, getMistakePatterns, getWrongQuestions, getUnansweredQuestions, getReviewQuestions,
     overallAccuracy, avgTimePerQ, ncertAnswers, ncertAccuracy,
+    unansweredCount,
     conceptStats, weakest, strongest,
     formatTime, retryWrong, openFlashcards, exitQuiz,
   };

@@ -364,51 +364,78 @@ describe('AnswerReview Component', () => {
 });
 
 describe('History Component', () => {
+  const makeHistory = (overrides = {}) => [{
+    id: 1, date: '2026-01-15T10:00:00Z', totalQuestions: 60,
+    correct: 40, accuracy: 67, totalTime: 600, answers: [],
+    ...overrides,
+  }];
+
+  const defaultProps = {
+    history: makeHistory(),
+    clearHistory: vi.fn(),
+    deleteAttempt: vi.fn(),
+    viewAttempt: vi.fn(),
+    setScreen: vi.fn(),
+  };
+
   it('shows empty state when no history', () => {
-    render(<History history={[]} clearHistory={vi.fn()} viewAttempt={vi.fn()} setScreen={vi.fn()} />);
+    render(<History {...defaultProps} history={[]} />);
     expect(screen.getByText('No quiz attempts yet.')).toBeInTheDocument();
   });
 
   it('shows attempts when history exists', () => {
-    const history = [{
-      id: 1, date: '2026-01-15T10:00:00Z', totalQuestions: 60,
-      correct: 40, accuracy: 67, totalTime: 600,
-      answers: [],
-    }];
-    render(<History history={history} clearHistory={vi.fn()} viewAttempt={vi.fn()} setScreen={vi.fn()} />);
+    render(<History {...defaultProps} />);
     expect(screen.getByText('67%')).toBeInTheDocument();
     expect(screen.getByText('40/60')).toBeInTheDocument();
   });
 
   it('calls viewAttempt on attempt click', () => {
     const viewAttempt = vi.fn();
-    const history = [{
-      id: 1, date: '2026-01-15T10:00:00Z', totalQuestions: 60,
-      correct: 40, accuracy: 67, totalTime: 600, answers: [],
-    }];
-    render(<History history={history} clearHistory={vi.fn()} viewAttempt={viewAttempt} setScreen={vi.fn()} />);
+    render(<History {...defaultProps} viewAttempt={viewAttempt} />);
     fireEvent.click(screen.getByText('View Details'));
-    expect(viewAttempt).toHaveBeenCalledWith(history[0]);
+    expect(viewAttempt).toHaveBeenCalledWith(defaultProps.history[0]);
   });
 
   it('shows Clear All button when history exists', () => {
-    const history = [{
-      id: 1, date: '2026-01-15T10:00:00Z', totalQuestions: 60,
-      correct: 40, accuracy: 67, totalTime: 600, answers: [],
-    }];
-    render(<History history={history} clearHistory={vi.fn()} viewAttempt={vi.fn()} setScreen={vi.fn()} />);
+    render(<History {...defaultProps} />);
     expect(screen.getByText('Clear All')).toBeInTheDocument();
   });
 
   it('calls clearHistory on Clear All click', () => {
     const clearHistory = vi.fn();
-    const history = [{
-      id: 1, date: '2026-01-15T10:00:00Z', totalQuestions: 60,
-      correct: 40, accuracy: 67, totalTime: 600, answers: [],
-    }];
-    render(<History history={history} clearHistory={clearHistory} viewAttempt={vi.fn()} setScreen={vi.fn()} />);
+    render(<History {...defaultProps} clearHistory={clearHistory} />);
     fireEvent.click(screen.getByText('Clear All'));
     expect(clearHistory).toHaveBeenCalled();
+  });
+
+  it('renders delete button for each attempt', () => {
+    render(<History {...defaultProps} />);
+    expect(screen.getByLabelText('Delete attempt')).toBeInTheDocument();
+  });
+
+  it('calls deleteAttempt with correct ID on delete click', () => {
+    const deleteAttempt = vi.fn();
+    render(<History {...defaultProps} deleteAttempt={deleteAttempt} />);
+    fireEvent.click(screen.getByLabelText('Delete attempt'));
+    expect(deleteAttempt).toHaveBeenCalledWith(1);
+  });
+
+  it('delete click does not trigger viewAttempt', () => {
+    const viewAttempt = vi.fn();
+    const deleteAttempt = vi.fn();
+    render(<History {...defaultProps} viewAttempt={viewAttempt} deleteAttempt={deleteAttempt} />);
+    fireEvent.click(screen.getByLabelText('Delete attempt'));
+    expect(deleteAttempt).toHaveBeenCalled();
+    expect(viewAttempt).not.toHaveBeenCalled();
+  });
+
+  it('renders delete button for each of multiple attempts', () => {
+    const multi = [
+      { id: 1, date: '2026-01-15T10:00:00Z', totalQuestions: 60, correct: 40, accuracy: 67, totalTime: 600, answers: [] },
+      { id: 2, date: '2026-01-16T10:00:00Z', totalQuestions: 60, correct: 50, accuracy: 83, totalTime: 500, answers: [] },
+    ];
+    render(<History {...defaultProps} history={multi} />);
+    expect(screen.getAllByLabelText('Delete attempt')).toHaveLength(2);
   });
 });
 

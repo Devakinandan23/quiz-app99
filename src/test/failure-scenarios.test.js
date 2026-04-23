@@ -11,21 +11,22 @@ import { useQuiz } from '../hooks/useQuiz';
 import { QUESTIONS } from '../data/questions';
 import { exportAsCSV } from '../utils/exportResults';
 
-// Mock localStorage
-const localStorageMock = (() => {
-  let store = {};
-  return {
-    getItem: vi.fn(key => store[key] ?? null),
-    setItem: vi.fn((key, val) => { store[key] = val; }),
-    removeItem: vi.fn(key => { delete store[key]; }),
-    clear: vi.fn(() => { store = {}; }),
-  };
-})();
+// Mock localStorage with resettable store
+let store = {};
+const localStorageMock = {
+  getItem: vi.fn(key => store[key] ?? null),
+  setItem: vi.fn((key, val) => { store[key] = val; }),
+  removeItem: vi.fn(key => { delete store[key]; }),
+  clear: vi.fn(() => { store = {}; }),
+};
 Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 
 beforeEach(() => {
-  localStorageMock.clear();
-  vi.clearAllMocks();
+  store = {};
+  localStorageMock.getItem.mockImplementation(key => store[key] ?? null);
+  localStorageMock.setItem.mockImplementation((key, val) => { store[key] = val; });
+  localStorageMock.removeItem.mockImplementation(key => { delete store[key]; });
+  localStorageMock.clear.mockImplementation(() => { store = {}; });
 });
 
 describe('Corrupt localStorage', () => {
@@ -60,19 +61,24 @@ describe('Corrupt localStorage', () => {
   });
 
   it('survives localStorage quota exceeded on save', () => {
-    const { result } = renderHook(() => useQuiz());
-    localStorageMock.setItem.mockImplementation(() => {
+    // Use a fresh mock that throws only for setItem
+    const origSetItem = localStorageMock.setItem;
+    localStorageMock.setItem = vi.fn(() => {
       throw new DOMException('QuotaExceededError');
     });
 
+    const { result } = renderHook(() => useQuiz());
     act(() => result.current.startQuiz('all'));
     // finishQuiz calls saveHistory which calls localStorage.setItem
-    // should not crash the app
+    // should not crash the app — saveHistory has try/catch
     expect(() => {
       act(() => result.current.finishQuiz());
     }).not.toThrow();
     // Quiz should still finish and show results
     expect(result.current.screen).toBe('analytics');
+
+    // Restore
+    localStorageMock.setItem = origSetItem;
   });
 });
 
@@ -114,13 +120,18 @@ describe('Empty quiz edge cases', () => {
     expect(result.current.screen).toBe('quiz');
   });
 
-  it('finishQuiz with 0 questions does not produce NaN accuracy', () => {
+  it('finishQuiz with 0 questions does not crash or produce NaN', () => {
     const { result } = renderHook(() => useQuiz());
     act(() => result.current.startQuiz('impossible'));
-    act(() => result.current.finishQuiz());
+    // finishQuiz with empty quiz should not crash
+    expect(() => {
+      act(() => result.current.finishQuiz());
+    }).not.toThrow();
     expect(result.current.answers).toHaveLength(0);
     expect(result.current.overallAccuracy).toBe(0);
     expect(Number.isNaN(result.current.overallAccuracy)).toBe(false);
+    // saveAttempt should be skipped (no history entry for empty quiz)
+    expect(result.current.history).toHaveLength(0);
   });
 
   it('retryWrong with zero wrong questions creates empty quiz', () => {
@@ -189,13 +200,12 @@ describe('Navigation boundary abuse', () => {
     expect(result.current.currentIdx).toBe(0);
   });
 
-  it('goToQuestion with float is handled', () => {
+  it('goToQuestion with float is rejected (non-integer)', () => {
     const { result } = renderHook(() => useQuiz());
     act(() => result.current.startQuiz('all'));
     act(() => result.current.goToQuestion(5.7));
-    // 5.7 >= 0 and < 60, so it passes the bounds check
-    // Whether it navigates or not, it shouldn't crash
-    expect(() => result.current.currentIdx).not.toThrow();
+    // Non-integer is rejected by Number.isInteger check
+    expect(result.current.currentIdx).toBe(0);
   });
 });
 
@@ -277,22 +287,34 @@ describe('viewAttempt with stale/invalid data', () => {
 
 describe('CSV export edge cases', () => {
   // Why: Special characters in questions break CSV parsing in Excel
+  let createElementSpy;
 
-  it('handles empty answers array', () => {
-    const mockClick = vi.fn();
-    vi.spyOn(document, 'createElement').mockReturnValue({ href: '', download: '', click: mockClick });
+  beforeEach(() => {
+    createElementSpy = vi.spyOn(document, 'createElement');
     global.URL.createObjectURL = vi.fn(() => 'blob:mock');
     global.URL.revokeObjectURL = vi.fn();
+  });
 
+  afterEach(() => {
+    createElementSpy.mockRestore(); // critical: restore real createElement
+  });
+
+  function mockAnchor() {
+    const orig = createElementSpy.getMockImplementation();
+    const realCreate = document.createElement.bind(document);
+    createElementSpy.mockImplementation((tag) => {
+      if (tag === 'a') return { href: '', download: '', click: vi.fn() };
+      return realCreate(tag);
+    });
+  }
+
+  it('handles empty answers array', () => {
+    mockAnchor();
     expect(() => exportAsCSV([], 0, 0)).not.toThrow();
   });
 
   it('handles answers with null selected (unanswered)', () => {
-    const mockClick = vi.fn();
-    vi.spyOn(document, 'createElement').mockReturnValue({ href: '', download: '', click: mockClick });
-    global.URL.createObjectURL = vi.fn(() => 'blob:mock');
-    global.URL.revokeObjectURL = vi.fn();
-
+    mockAnchor();
     const answers = [
       { qId: 1, selected: null, correct: 1, isCorrect: false, isUnanswered: true, time: 0, concept: 'M', diff: 'easy', ncert: false },
     ];
@@ -300,11 +322,7 @@ describe('CSV export edge cases', () => {
   });
 
   it('handles answers with invalid qId (no matching question)', () => {
-    const mockClick = vi.fn();
-    vi.spyOn(document, 'createElement').mockReturnValue({ href: '', download: '', click: mockClick });
-    global.URL.createObjectURL = vi.fn(() => 'blob:mock');
-    global.URL.revokeObjectURL = vi.fn();
-
+    mockAnchor();
     const answers = [
       { qId: 99999, selected: 0, correct: 0, isCorrect: false, time: 5 },
     ];

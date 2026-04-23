@@ -13,7 +13,12 @@ function loadHistory() {
 }
 
 function saveHistory(history) {
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  } catch {
+    // localStorage quota exceeded or unavailable — fail silently
+    // History won't persist but quiz results are still shown in-memory
+  }
 }
 
 export function useQuiz() {
@@ -54,7 +59,28 @@ export function useQuiz() {
     }));
   };
 
+  // Compress answers for localStorage: only store qId, selected, time
+  // Everything else (concept, diff, ncert, correct, isCorrect, isUnanswered)
+  // can be rehydrated from QUESTIONS at read time
+  const compressAnswers = (answers) =>
+    answers.map(a => [a.qId, a.selected, a.time]); // [qId, selected|null, timeInSec]
+
+  const rehydrateAnswers = (compressed, questions) =>
+    compressed.map(([qId, selected, time]) => {
+      const q = questions.find(qq => qq.id === qId);
+      return {
+        qId, selected, time,
+        correct: q ? q.ans : 0,
+        isCorrect: q ? selected === q.ans : false,
+        isUnanswered: selected === null || selected === undefined,
+        concept: q ? q.concept : "Unknown",
+        diff: q ? q.diff : "easy",
+        ncert: q ? q.ncert : false,
+      };
+    });
+
   const saveAttempt = (finalAnswers, finalTotalTimer) => {
+    if (!finalAnswers.length) return; // guard against empty quiz
     const correct = finalAnswers.filter(a => a.isCorrect).length;
     const attempt = {
       id: Date.now(),
@@ -63,7 +89,7 @@ export function useQuiz() {
       correct,
       accuracy: Math.round((correct / finalAnswers.length) * 100),
       totalTime: finalTotalTimer,
-      answers: finalAnswers,
+      answers: compressAnswers(finalAnswers), // ~3KB instead of ~430KB
     };
     const updated = [attempt, ...history];
     setHistory(updated);
@@ -73,6 +99,16 @@ export function useQuiz() {
   const clearHistory = () => {
     setHistory([]);
     localStorage.removeItem(HISTORY_KEY);
+  };
+
+  const deleteAttempt = (attemptId) => {
+    const updated = history.filter(a => a.id !== attemptId);
+    setHistory(updated);
+    if (updated.length === 0) {
+      localStorage.removeItem(HISTORY_KEY);
+    } else {
+      saveHistory(updated);
+    }
   };
 
   const startQuiz = (filter) => {
@@ -112,7 +148,7 @@ export function useQuiz() {
   };
 
   const goToQuestion = (idx) => {
-    if (idx < 0 || idx >= quizQuestions.length) return;
+    if (!Number.isInteger(idx) || idx < 0 || idx >= quizQuestions.length) return;
     saveCurrentQuestionTime();
     setCurrentIdx(idx);
     setQuestionTimer(0);
@@ -206,7 +242,10 @@ export function useQuiz() {
   const weakest = conceptStats.length ? conceptStats[0] : null;
   const strongest = conceptStats.length ? conceptStats[conceptStats.length - 1] : null;
 
-  const formatTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  const formatTime = (s) => {
+    const safe = Math.max(0, Math.floor(s)) || 0; // clamp negatives, NaN, floats
+    return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, "0")}`;
+  };
 
   const retryWrong = () => {
     const wrongIds = getWrongQuestions().map(q => q.id);
@@ -265,7 +304,13 @@ export function useQuiz() {
   }, []);
 
   const viewAttempt = (attempt) => {
-    setAnswers(attempt.answers);
+    // Handle both compressed [qId, selected, time] and legacy full-object formats
+    const rawAnswers = attempt.answers || [];
+    const isCompressed = rawAnswers.length > 0 && Array.isArray(rawAnswers[0]);
+    const hydrated = isCompressed
+      ? rehydrateAnswers(rawAnswers, QUESTIONS)
+      : rawAnswers;
+    setAnswers(hydrated);
     setTotalTimer(attempt.totalTime);
     setScreen("analytics");
   };
@@ -278,7 +323,7 @@ export function useQuiz() {
     flashcardFlipped, setFlashcardFlipped,
     quizQuestions,
     userAnswers, markedForReview,
-    history, clearHistory, viewAttempt,
+    history, clearHistory, deleteAttempt, viewAttempt,
     startQuiz, handleSelect, clearResponse,
     toggleMarkForReview, goToQuestion,
     prevQuestion, nextQuestion, finishQuiz,

@@ -1,6 +1,10 @@
+import { useState } from "react";
 import { S } from "../styles/styles";
 
-export default function History({ history, clearHistory, viewAttempt, setScreen }) {
+export default function History({ history, clearHistory, deleteAttempt, viewAttempt, setScreen }) {
+  // confirmAction: null | { type: "delete" | "clearAll", id?: string, title: string, message: string }
+  const [confirmAction, setConfirmAction] = useState(null);
+
   const formatTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
   const formatDate = (iso) => {
@@ -10,6 +14,32 @@ export default function History({ history, clearHistory, viewAttempt, setScreen 
       hour: "2-digit", minute: "2-digit",
     });
   };
+
+  const handleDelete = (e, attemptId) => {
+    e.stopPropagation();
+    setConfirmAction({
+      type: "delete",
+      id: attemptId,
+      title: "Delete this attempt?",
+      message: "This quiz attempt will be permanently removed from your history. This action cannot be undone.",
+    });
+  };
+
+  const handleClearAll = () => {
+    setConfirmAction({
+      type: "clearAll",
+      title: "Clear all history?",
+      message: `All ${history.length} attempt${history.length !== 1 ? "s" : ""} will be permanently deleted. This action cannot be undone.`,
+    });
+  };
+
+  const confirmDelete = () => {
+    if (confirmAction.type === "delete") deleteAttempt(confirmAction.id);
+    else if (confirmAction.type === "clearAll") clearHistory();
+    setConfirmAction(null);
+  };
+
+  const cancelDelete = () => setConfirmAction(null);
 
   return (
     <div style={S.page}>
@@ -24,7 +54,7 @@ export default function History({ history, clearHistory, viewAttempt, setScreen 
             {history.length > 0 && (
               <button
                 style={{ ...S.navBtn, color: "#dc2626", borderColor: "#dc2626" }}
-                onClick={clearHistory}
+                onClick={handleClearAll}
               >
                 Clear All
               </button>
@@ -38,6 +68,105 @@ export default function History({ history, clearHistory, viewAttempt, setScreen 
           }}>
             <p style={{ fontSize: 15, marginBottom: 4 }}>No quiz attempts yet.</p>
             <p style={{ fontSize: 13 }}>Complete a quiz to see your history here.</p>
+          </div>
+        )}
+
+        {/* ── Confirmation Dialog ── */}
+        {confirmAction !== null && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-dialog-title"
+            style={{
+              position: "fixed", inset: 0, zIndex: 1000,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              background: "rgba(0,0,0,0.45)",
+              backdropFilter: "blur(4px)",
+              WebkitBackdropFilter: "blur(4px)",
+              animation: "fadeIn 0.15s ease",
+            }}
+            onClick={cancelDelete}
+          >
+            <div
+              style={{
+                background: "#fff",
+                borderRadius: 16,
+                padding: "32px 28px 24px",
+                width: "min(380px, 90vw)",
+                boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
+                display: "flex", flexDirection: "column", gap: 12,
+                animation: "slideUp 0.18s ease",
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Icon */}
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 4 }}>
+                <div style={{
+                  background: "#fef2f2", borderRadius: "50%",
+                  width: 52, height: 52, display: "flex",
+                  alignItems: "center", justifyContent: "center",
+                }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                    <line x1="10" y1="11" x2="10" y2="17" />
+                    <line x1="14" y1="11" x2="14" y2="17" />
+                  </svg>
+                </div>
+              </div>
+
+              <h2 id="confirm-dialog-title" style={{
+                margin: 0, fontSize: 18, fontWeight: 700,
+                color: "#111827", textAlign: "center",
+              }}>
+                {confirmAction.title}
+              </h2>
+              <p style={{
+                margin: 0, fontSize: 14, color: "#6b7280",
+                textAlign: "center", lineHeight: 1.55,
+              }}>
+                {confirmAction.message}
+              </p>
+
+              {/* Buttons */}
+              <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+                <button
+                  id="confirm-cancel-btn"
+                  onClick={cancelDelete}
+                  style={{
+                    flex: 1, padding: "10px 0", borderRadius: 8,
+                    border: "1px solid #e5e7eb", background: "#fff",
+                    fontSize: 14, fontWeight: 500, color: "#374151",
+                    cursor: "pointer", transition: "background 0.15s",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
+                  onMouseLeave={e => e.currentTarget.style.background = "#fff"}
+                >
+                  Cancel
+                </button>
+                <button
+                  id="confirm-delete-btn"
+                  onClick={confirmDelete}
+                  style={{
+                    flex: 1, padding: "10px 0", borderRadius: 8,
+                    border: "none", background: "#dc2626",
+                    fontSize: 14, fontWeight: 600, color: "#fff",
+                    cursor: "pointer", transition: "background 0.15s",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#b91c1c"}
+                  onMouseLeave={e => e.currentTarget.style.background = "#dc2626"}
+                >
+                  {confirmAction.type === "clearAll" ? "Clear All" : "Delete"}
+                </button>
+              </div>
+            </div>
+
+            {/* Keyframe animations */}
+            <style>{`
+              @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+              @keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+            `}</style>
           </div>
         )}
 
@@ -61,9 +190,32 @@ export default function History({ history, clearHistory, viewAttempt, setScreen 
               }}>
                 Attempt #{history.length - idx}
               </span>
-              <span style={{ fontSize: 12, color: "#9ca3af" }}>
-                {formatDate(attempt.date)}
-              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 12, color: "#9ca3af" }}>
+                  {formatDate(attempt.date)}
+                </span>
+                <button
+                  onClick={(e) => handleDelete(e, attempt.id)}
+                  title="Delete this attempt"
+                  aria-label="Delete attempt"
+                  style={{
+                    background: "none", border: "none", cursor: "pointer",
+                    padding: 4, borderRadius: 6, display: "flex",
+                    alignItems: "center", justifyContent: "center",
+                    transition: "background 0.15s",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#fef2f2"}
+                  onMouseLeave={e => e.currentTarget.style.background = "none"}
+                >
+                  {/* Trash icon SVG */}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                    <line x1="10" y1="11" x2="10" y2="17" />
+                    <line x1="14" y1="11" x2="14" y2="17" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>

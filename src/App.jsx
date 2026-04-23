@@ -65,6 +65,7 @@ function App() {
       <History
         history={quiz.history}
         clearHistory={quiz.clearHistory}
+        deleteAttempt={quiz.deleteAttempt}
         viewAttempt={quiz.viewAttempt}
         setScreen={quiz.setScreen}
       />

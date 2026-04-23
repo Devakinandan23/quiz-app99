@@ -10,20 +10,21 @@ import { renderHook, act } from '@testing-library/react';
 import { useQuiz } from '../hooks/useQuiz';
 import { QUESTIONS } from '../data/questions';
 
-const localStorageMock = (() => {
-  let store = {};
-  return {
-    getItem: vi.fn(key => store[key] ?? null),
-    setItem: vi.fn((key, val) => { store[key] = val; }),
-    removeItem: vi.fn(key => { delete store[key]; }),
-    clear: vi.fn(() => { store = {}; }),
-  };
-})();
+let store = {};
+const localStorageMock = {
+  getItem: vi.fn(key => store[key] ?? null),
+  setItem: vi.fn((key, val) => { store[key] = val; }),
+  removeItem: vi.fn(key => { delete store[key]; }),
+  clear: vi.fn(() => { store = {}; }),
+};
 Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 
 beforeEach(() => {
-  localStorageMock.clear();
-  vi.clearAllMocks();
+  store = {};
+  localStorageMock.getItem.mockImplementation(key => store[key] ?? null);
+  localStorageMock.setItem.mockImplementation((key, val) => { store[key] = val; });
+  localStorageMock.removeItem.mockImplementation(key => { delete store[key]; });
+  localStorageMock.clear.mockImplementation(() => { store = {}; });
 });
 
 // Seed-based pseudo-random for reproducibility
@@ -228,17 +229,32 @@ describe('PROPERTY: NCERT accuracy is bounded and consistent', () => {
 });
 
 describe('PROPERTY: formatTime never returns invalid format', () => {
+  // Why: Timer display must always show valid mm:ss — never NaN, floats, or negatives
+
   const testValues = [0, 1, 30, 59, 60, 61, 119, 120, 600, 3599, 3600, 7200, -1, -60, 0.5, NaN];
 
   testValues.forEach(val => {
-    it(`formatTime(${val}) returns valid mm:ss format`, () => {
+    it(`formatTime(${val}) returns valid non-negative mm:ss format`, () => {
       const { result } = renderHook(() => useQuiz());
       const formatted = result.current.formatTime(val);
-      // Should match pattern: number:two-digit-number
-      if (!Number.isNaN(val)) {
-        expect(formatted).toMatch(/^-?\d+:\d{2}$/);
-      }
+      // After fix: negatives & NaN clamp to 0, floats are floored
+      expect(formatted).toMatch(/^\d+:\d{2}$/);
     });
+  });
+
+  it('formatTime(-1) clamps to 0:00', () => {
+    const { result } = renderHook(() => useQuiz());
+    expect(result.current.formatTime(-1)).toBe('0:00');
+  });
+
+  it('formatTime(NaN) clamps to 0:00', () => {
+    const { result } = renderHook(() => useQuiz());
+    expect(result.current.formatTime(NaN)).toBe('0:00');
+  });
+
+  it('formatTime(0.5) floors to 0:00', () => {
+    const { result } = renderHook(() => useQuiz());
+    expect(result.current.formatTime(0.5)).toBe('0:00');
   });
 });
 

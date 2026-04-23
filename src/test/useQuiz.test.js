@@ -2,21 +2,21 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useQuiz } from '../hooks/useQuiz';
 
-// Mock localStorage
-const localStorageMock = (() => {
-  let store = {};
-  return {
-    getItem: vi.fn(key => store[key] ?? null),
-    setItem: vi.fn((key, val) => { store[key] = val; }),
-    removeItem: vi.fn(key => { delete store[key]; }),
-    clear: vi.fn(() => { store = {}; }),
-  };
-})();
+let store = {};
+const localStorageMock = {
+  getItem: vi.fn(key => store[key] ?? null),
+  setItem: vi.fn((key, val) => { store[key] = val; }),
+  removeItem: vi.fn(key => { delete store[key]; }),
+  clear: vi.fn(() => { store = {}; }),
+};
 Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 
 beforeEach(() => {
-  localStorageMock.clear();
-  vi.clearAllMocks();
+  store = {};
+  localStorageMock.getItem.mockImplementation(key => store[key] ?? null);
+  localStorageMock.setItem.mockImplementation((key, val) => { store[key] = val; });
+  localStorageMock.removeItem.mockImplementation(key => { delete store[key]; });
+  localStorageMock.clear.mockImplementation(() => { store = {}; });
 });
 
 describe('useQuiz Hook', () => {
@@ -301,7 +301,7 @@ describe('useQuiz Hook', () => {
     expect(wrong[0].id).toBe(q.id);
   });
 
-  it('viewAttempt loads past attempt data', () => {
+  it('viewAttempt loads and rehydrates past attempt data', () => {
     const { result } = renderHook(() => useQuiz());
     act(() => result.current.startQuiz('all'));
     act(() => result.current.handleSelect(1));
@@ -312,8 +312,19 @@ describe('useQuiz Hook', () => {
 
     act(() => result.current.viewAttempt(attempt));
     expect(result.current.screen).toBe('analytics');
-    expect(result.current.answers).toEqual(attempt.answers);
     expect(result.current.totalTimer).toBe(attempt.totalTime);
+    // Answers are rehydrated from compressed format
+    expect(result.current.answers).toHaveLength(attempt.totalQuestions);
+    // Each rehydrated answer has full fields
+    result.current.answers.forEach(a => {
+      expect(a).toHaveProperty('qId');
+      expect(a).toHaveProperty('selected');
+      expect(a).toHaveProperty('correct');
+      expect(a).toHaveProperty('isCorrect');
+      expect(a).toHaveProperty('isUnanswered');
+      expect(a).toHaveProperty('concept');
+      expect(a).toHaveProperty('diff');
+    });
   });
 
   it('formatTime formats seconds correctly', () => {

@@ -10,21 +10,21 @@ import { renderHook, act } from '@testing-library/react';
 import { useQuiz } from '../hooks/useQuiz';
 import { QUESTIONS } from '../data/questions';
 
-// Mock localStorage
-const localStorageMock = (() => {
-  let store = {};
-  return {
-    getItem: vi.fn(key => store[key] ?? null),
-    setItem: vi.fn((key, val) => { store[key] = val; }),
-    removeItem: vi.fn(key => { delete store[key]; }),
-    clear: vi.fn(() => { store = {}; }),
-  };
-})();
+let store = {};
+const localStorageMock = {
+  getItem: vi.fn(key => store[key] ?? null),
+  setItem: vi.fn((key, val) => { store[key] = val; }),
+  removeItem: vi.fn(key => { delete store[key]; }),
+  clear: vi.fn(() => { store = {}; }),
+};
 Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 
 beforeEach(() => {
-  localStorageMock.clear();
-  vi.clearAllMocks();
+  store = {};
+  localStorageMock.getItem.mockImplementation(key => store[key] ?? null);
+  localStorageMock.setItem.mockImplementation((key, val) => { store[key] = val; });
+  localStorageMock.removeItem.mockImplementation(key => { delete store[key]; });
+  localStorageMock.clear.mockImplementation(() => { store = {}; });
 });
 
 describe('INVARIANT: answers.length === quizQuestions.length after finishQuiz', () => {

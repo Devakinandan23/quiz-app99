@@ -6,7 +6,7 @@ const RULES = [
   "The timer runs per question and overall — manage your time.",
   "No answers or explanations will be shown during the test.",
   "After completing the test, you can review all answers with explanations.",
-  "Questions are ordered: Easy → Medium → Hard.",
+  "Questions are grouped by subject: Chemistry, Physics, Maths, English, Logical Reasoning.",
 ];
 
 export default function Dashboard({ startQuiz }) {

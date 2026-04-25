@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { S } from "../styles/styles";
 import { exportAsCSV, exportAsPDF } from "../utils/exportResults";
+import { SUBJECTS, SUBJECT_COLORS } from "../data/questions";
 
 export default function Analytics({
   answers, overallAccuracy, avgTimePerQ, ncertAccuracy, ncertAnswers,
@@ -178,22 +179,23 @@ export default function Analytics({
         )}
 
         <div style={{ marginBottom: 32 }}>
-          <h2 style={S.sectionTitle}>Difficulty Performance</h2>
-          {["easy", "medium", "hard"].map(d => {
-            const dAnswers = answers.filter(a => a.diff === d);
-            if (!dAnswers.length) return null;
-            const dAcc = Math.round(dAnswers.filter(a => a.isCorrect).length / dAnswers.length * 100);
+          <h2 style={S.sectionTitle}>Subject Performance</h2>
+          {SUBJECTS.map(subject => {
+            const sAnswers = answers.filter(a => a.subject === subject);
+            if (!sAnswers.length) return null;
+            const sAcc = Math.round(sAnswers.filter(a => a.isCorrect).length / sAnswers.length * 100);
+            const color = SUBJECT_COLORS[subject] || "#6b7280";
             return (
-              <div key={d} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
-                <span style={{ width: 64, fontSize: 13, fontWeight: 500, textTransform: "capitalize" }}>{d}</span>
+              <div key={subject} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                <span style={{ width: 120, fontSize: 13, fontWeight: 500 }}>{subject}</span>
                 <div style={{ flex: 1, height: 8, background: "#f3f4f6", borderRadius: 4, overflow: "hidden" }}>
                   <div style={{
                     height: "100%", borderRadius: 4,
-                    width: `${dAcc}%`,
-                    background: d === "easy" ? "#059669" : d === "medium" ? "#d97706" : "#dc2626"
+                    width: `${sAcc}%`,
+                    background: color,
                   }} />
                 </div>
-                <span style={{ fontSize: 13, fontWeight: 600, width: 40, textAlign: "right" }}>{dAcc}%</span>
+                <span style={{ fontSize: 13, fontWeight: 600, width: 40, textAlign: "right" }}>{sAcc}%</span>
               </div>
             );
           })}

@@ -1,9 +1,12 @@
 import { useState } from "react";
+import { SUBJECT_COLORS } from "../data/questions";
 
 const SECTION_MAP = {
-  easy: { label: "Easy", color: "#059669", bg: "#ecfdf5" },
-  medium: { label: "Medium", color: "#d97706", bg: "#fffbeb" },
-  hard: { label: "Hard", color: "#dc2626", bg: "#fef2f2" },
+  Physics:           { label: "Physics",           color: "#2563eb", bg: "#eff6ff" },
+  Chemistry:         { label: "Chemistry",         color: "#059669", bg: "#ecfdf5" },
+  Maths:             { label: "Maths",             color: "#7c3aed", bg: "#f5f3ff" },
+  English:           { label: "English",           color: "#d97706", bg: "#fffbeb" },
+  "Logical Reasoning": { label: "Logical Reasoning", color: "#dc2626", bg: "#fef2f2" },
 };
 
 export default function Quiz({
@@ -22,13 +25,13 @@ export default function Quiz({
   const unansweredCount = quizQuestions.length - answeredCount;
   const markedCount = markedForReview.size;
 
-  // Group questions by difficulty section
+  // Group questions by subject section
   const sections = [];
-  let lastDiff = null;
+  let lastSubject = null;
   quizQuestions.forEach((qq, idx) => {
-    if (qq.diff !== lastDiff) {
-      sections.push({ diff: qq.diff, startIdx: idx, indices: [] });
-      lastDiff = qq.diff;
+    if (qq.subject !== lastSubject) {
+      sections.push({ subject: qq.subject, startIdx: idx, indices: [] });
+      lastSubject = qq.subject;
     }
     sections[sections.length - 1].indices.push(idx);
   });
@@ -77,9 +80,9 @@ export default function Quiz({
 
         <div style={{ flex: 1, overflowY: "auto", padding: "8px 10px" }}>
           {sections.map(sec => {
-            const s = SECTION_MAP[sec.diff];
+            const s = SECTION_MAP[sec.subject] || { label: sec.subject, color: "#6b7280", bg: "#f3f4f6" };
             return (
-              <div key={sec.diff} style={{ marginBottom: 12 }}>
+              <div key={sec.subject} style={{ marginBottom: 12 }}>
                 <button
                   onClick={() => goToQuestion(sec.startIdx)}
                   style={{

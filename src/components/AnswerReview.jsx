@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { S } from "../styles/styles";
-import { QUESTIONS, DIFF_MAP } from "../data/questions";
+import { QUESTIONS, SUBJECT_COLORS } from "../data/questions";
 
 export default function AnswerReview({ answers, setScreen }) {
   const [filter, setFilter] = useState("all");
@@ -110,10 +110,10 @@ export default function AnswerReview({ answers, setScreen }) {
                   <span style={{ fontSize: 12, color: "#6b7280" }}>Q{q.id}</span>
                   <span style={{
                     ...S.badge,
-                    background: q.diff === "easy" ? "#ecfdf5" : q.diff === "medium" ? "#fffbeb" : "#fef2f2",
-                    color: q.diff === "easy" ? "#059669" : q.diff === "medium" ? "#d97706" : "#dc2626",
+                    background: (SUBJECT_COLORS[q.subject] || "#6b7280") + "22",
+                    color: SUBJECT_COLORS[q.subject] || "#6b7280",
                   }}>
-                    {DIFF_MAP[q.diff]}
+                    {q.subject}
                   </span>
                   {q.ncert && <span style={{ ...S.badge, background: "#eff6ff", color: "#2563eb" }}>NCERT</span>}
                 </div>

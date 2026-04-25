@@ -74,7 +74,7 @@ export function useQuiz() {
         isCorrect: q ? selected === q.ans : false,
         isUnanswered: selected === null || selected === undefined,
         concept: q ? q.concept : "Unknown",
-        diff: q ? q.diff : "easy",
+        subject: q ? q.subject : "Unknown",
         ncert: q ? q.ncert : false,
       };
     });
@@ -112,7 +112,7 @@ export function useQuiz() {
   };
 
   const startQuiz = (filter) => {
-    const filtered = filter === "all" ? [...QUESTIONS] : QUESTIONS.filter(q => q.diff === filter);
+    const filtered = filter === "all" ? [...QUESTIONS] : QUESTIONS.filter(q => q.subject === filter);
     setQuizQuestions(filtered);
     setAnswers([]);
     setCurrentIdx(0);
@@ -178,7 +178,7 @@ export function useQuiz() {
         isUnanswered: selected === null,
         time: finalTimes[idx] || 0,
         concept: q.concept,
-        diff: q.diff,
+        subject: q.subject,
         ncert: q.ncert,
       };
     });
@@ -293,7 +293,7 @@ export function useQuiz() {
             qId: q.id, selected: sel, correct: q.ans,
             isCorrect: sel === q.ans, isUnanswered: skip,
             time: Math.floor(Math.random() * 30) + 3,
-            concept: q.concept, diff: q.diff, ncert: q.ncert,
+            concept: q.concept, subject: q.subject, ncert: q.ncert,
           };
         });
         setAnswers(fakeAnswers);

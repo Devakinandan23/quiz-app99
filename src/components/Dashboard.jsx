@@ -9,13 +9,18 @@ const RULES = [
   "Questions are grouped by subject: Chemistry, Physics, Maths, English, Logical Reasoning.",
 ];
 
-export default function Dashboard({ startQuiz }) {
+import { QUIZ_CATALOG } from "../data/questions";
+
+export default function Dashboard({ startQuiz, activeQuizId, goHome }) {
+  const quiz = QUIZ_CATALOG[activeQuizId];
+  if (!quiz) return null;
+
   return (
     <div style={S.page}>
       <div style={S.container}>
         <div style={{ textAlign: "center", marginBottom: 36 }}>
-          <h1 style={{ ...S.title, fontSize: 28 }}>ChemPrep</h1>
-          <p style={S.subtitle}>NCERT Chemistry · Chapters 1, 2 & 4</p>
+          <h1 style={{ ...S.title, fontSize: 28 }}>{quiz.title}</h1>
+          <p style={S.subtitle}>{quiz.description}</p>
         </div>
 
         <div style={{
@@ -30,14 +35,19 @@ export default function Dashboard({ startQuiz }) {
           </ol>
         </div>
 
-        <div style={{ textAlign: "center" }}>
-          <button
-            style={{ ...S.primaryBtn, padding: "14px 48px", fontSize: 17 }}
-            onClick={() => startQuiz("all")}
+        <div style={{ display: "flex", gap: 16, justifyContent: "center" }}>
+          <button 
+            style={{ ...S.primaryBtn, padding: "14px 48px", fontSize: 17, background: "#fff", color: "#1a1a1a", border: "1px solid #e5e5e3" }} 
+            onClick={goHome}
+          >
+            Back
+          </button>
+          <button 
+            style={{ ...S.primaryBtn, padding: "14px 48px", fontSize: 17 }} 
+            onClick={startQuiz}
           >
             Start Test
           </button>
-          <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 12 }}>60 questions · Timed</p>
         </div>
       </div>
     </div>

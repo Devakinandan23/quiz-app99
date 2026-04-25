@@ -1,20 +1,22 @@
 import { useState, useEffect, useRef } from "react";
-import { QUESTIONS } from "../data/questions";
+import { QUIZ_CATALOG, QUESTIONS } from "../data/questions";
 
-const HISTORY_KEY = "chemprep_history";
+const getHistoryKey = (quizId) => `chemprep_history_${quizId}`;
 
-function loadHistory() {
+function loadHistory(quizId) {
+  if (!quizId) return [];
   try {
-    const data = localStorage.getItem(HISTORY_KEY);
+    const data = localStorage.getItem(getHistoryKey(quizId));
     return data ? JSON.parse(data) : [];
   } catch {
     return [];
   }
 }
 
-function saveHistory(history) {
+function saveHistory(quizId, history) {
+  if (!quizId) return;
   try {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    localStorage.setItem(getHistoryKey(quizId), JSON.stringify(history));
   } catch {
     // localStorage quota exceeded or unavailable — fail silently
     // History won't persist but quiz results are still shown in-memory
@@ -22,7 +24,8 @@ function saveHistory(history) {
 }
 
 export function useQuiz() {
-  const [screen, setScreen] = useState("dashboard");
+  const [activeQuizId, setActiveQuizId] = useState(null);
+  const [screen, setScreen] = useState("home");
   const [answers, setAnswers] = useState([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [quizDone, setQuizDone] = useState(false);
@@ -31,8 +34,8 @@ export function useQuiz() {
   const [quizActive, setQuizActive] = useState(false);
   const [flashcardIdx, setFlashcardIdx] = useState(0);
   const [flashcardFlipped, setFlashcardFlipped] = useState(false);
-  const [quizQuestions, setQuizQuestions] = useState(QUESTIONS);
-  const [history, setHistory] = useState(loadHistory);
+  const [quizQuestions, setQuizQuestions] = useState([]);
+  const [history, setHistory] = useState([]);
 
   // Exam-style state
   const [userAnswers, setUserAnswers] = useState({}); // { questionIndex: selectedOptionIndex }
@@ -93,27 +96,36 @@ export function useQuiz() {
     };
     const updated = [attempt, ...history];
     setHistory(updated);
-    saveHistory(updated);
+    saveHistory(activeQuizId, updated);
   };
 
   const clearHistory = () => {
     setHistory([]);
-    localStorage.removeItem(HISTORY_KEY);
+    localStorage.removeItem(getHistoryKey(activeQuizId));
   };
 
   const deleteAttempt = (attemptId) => {
     const updated = history.filter(a => a.id !== attemptId);
     setHistory(updated);
     if (updated.length === 0) {
-      localStorage.removeItem(HISTORY_KEY);
+      localStorage.removeItem(getHistoryKey(activeQuizId));
     } else {
-      saveHistory(updated);
+      saveHistory(activeQuizId, updated);
     }
   };
 
-  const startQuiz = (filter) => {
-    const filtered = filter === "all" ? [...QUESTIONS] : QUESTIONS.filter(q => q.subject === filter);
-    setQuizQuestions(filtered);
+  const selectQuiz = (quizId) => {
+    const catalogEntry = QUIZ_CATALOG[quizId];
+    if (!catalogEntry) return;
+
+    setActiveQuizId(quizId);
+    setQuizQuestions(catalogEntry.questions);
+    setHistory(loadHistory(quizId));
+    setScreen("dashboard");
+  };
+
+  const startQuiz = () => {
+    if (!activeQuizId) return;
     setAnswers([]);
     setCurrentIdx(0);
     setUserAnswers({});
@@ -215,11 +227,11 @@ export function useQuiz() {
   };
 
   const getWrongQuestions = () => {
-    return answers.filter(a => !a.isCorrect && !a.isUnanswered).map(a => QUESTIONS.find(q => q.id === a.qId)).filter(Boolean);
+    return answers.filter(a => !a.isCorrect && !a.isUnanswered).map(a => quizQuestions.find(q => q.id === a.qId)).filter(Boolean);
   };
 
   const getUnansweredQuestions = () => {
-    return answers.filter(a => a.isUnanswered).map(a => QUESTIONS.find(q => q.id === a.qId)).filter(Boolean);
+    return answers.filter(a => a.isUnanswered).map(a => quizQuestions.find(q => q.id === a.qId)).filter(Boolean);
   };
 
   const getReviewQuestions = (filter) => {
@@ -227,7 +239,7 @@ export function useQuiz() {
     if (filter === "unanswered") return getUnansweredQuestions();
     // "all" = wrong + unanswered
     return answers.filter(a => !a.isCorrect).map(a => {
-      const q = QUESTIONS.find(qq => qq.id === a.qId);
+      const q = quizQuestions.find(qq => qq.id === a.qId);
       return q ? { ...q, _isUnanswered: a.isUnanswered } : null;
     }).filter(Boolean);
   };
@@ -249,7 +261,7 @@ export function useQuiz() {
 
   const retryWrong = () => {
     const wrongIds = getWrongQuestions().map(q => q.id);
-    const wrongQs = QUESTIONS.filter(q => wrongIds.includes(q.id));
+    const wrongQs = quizQuestions.filter(q => wrongIds.includes(q.id));
     setQuizQuestions(wrongQs);
     setAnswers([]);
     setCurrentIdx(0);
@@ -272,6 +284,8 @@ export function useQuiz() {
   const exitQuiz = () => {
     clearInterval(timerRef.current);
     setQuizActive(false);
+    setActiveQuizId(null);
+    setHistory([]);
     setAnswers([]);
     setCurrentIdx(0);
     setUserAnswers({});
@@ -279,14 +293,14 @@ export function useQuiz() {
     setQuestionTimes({});
     setQuestionTimer(0);
     setTotalTimer(0);
-    setScreen("dashboard");
+    setScreen("home");
   };
 
   // DEV SHORTCUT: call window.__devSkip() in browser console to jump to results
   useEffect(() => {
     if (import.meta.env.DEV) {
       window.__devSkip = () => {
-        const fakeAnswers = QUESTIONS.map(q => {
+        const fakeAnswers = quizQuestions.map(q => {
           const skip = Math.random() > 0.85;
           const sel = skip ? null : Math.floor(Math.random() * 4);
           return {
@@ -308,14 +322,21 @@ export function useQuiz() {
     const rawAnswers = attempt.answers || [];
     const isCompressed = rawAnswers.length > 0 && Array.isArray(rawAnswers[0]);
     const hydrated = isCompressed
-      ? rehydrateAnswers(rawAnswers, QUESTIONS)
+      ? rehydrateAnswers(rawAnswers, quizQuestions)
       : rawAnswers;
     setAnswers(hydrated);
     setTotalTimer(attempt.totalTime);
     setScreen("analytics");
   };
 
+  const goHome = () => {
+    setActiveQuizId(null);
+    setHistory([]);
+    setScreen("home");
+  };
+
   return {
+    activeQuizId,
     screen, setScreen,
     answers, currentIdx, quizDone,
     questionTimer, totalTimer, quizActive,
@@ -324,7 +345,7 @@ export function useQuiz() {
     quizQuestions,
     userAnswers, markedForReview,
     history, clearHistory, deleteAttempt, viewAttempt,
-    startQuiz, handleSelect, clearResponse,
+    selectQuiz, goHome, startQuiz, handleSelect, clearResponse,
     toggleMarkForReview, goToQuestion,
     prevQuestion, nextQuestion, finishQuiz,
     getConceptStats, getMistakePatterns, getWrongQuestions, getUnansweredQuestions, getReviewQuestions,

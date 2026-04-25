@@ -1401,3 +1401,18 @@ export const SUBJECT_MAP = {
   English:           "English",
  "Logical Reasoning": "Logical Reasoning",
 };
+
+export const QUIZ_CATALOG = {
+  "jee-mock-1": {
+    id: "jee-mock-1",
+    title: "JEE Mock Test 1",
+    description: "Physics, Chemistry, Maths",
+    questions: QUESTIONS // Reference existing array exactly as is
+  },
+  "ncert-chem": {
+    id: "ncert-chem",
+    title: "NCERT Chemistry",
+    description: "Chemistry specific test",
+    questions: QUESTIONS.filter(q => q.subject === "Chemistry")
+  }
+};

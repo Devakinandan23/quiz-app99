@@ -1,16 +1,84 @@
-# React + Vite
+# BITSAT Quiz Platform 🧪
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A responsive, multi-quiz React application built with Vite. It features a customizable catalog of tests, comprehensive analytics, answer review mechanics, and persistent progress tracking via `localStorage`.
 
-Currently, two official plugins are available:
+## Features
+- **Multi-Quiz Architecture**: Supports housing multiple independent tests within a single app.
+- **Persistent History**: Saves all attempt records (scores, accuracy, time taken) automatically to namespaced local storage.
+- **Detailed Analytics & Feedback**: Breaks down your performance by test topics, tracks unanswered/marked questions, and categorizes mistakes.
+- **Focus Modes**: Built-in Flashcards and "Retry Wrong Questions" modes.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Getting Started
 
-## React Compiler
+### Prerequisites
+Make sure you have [Node.js](https://nodejs.org/) installed on your machine.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Installation
+1. Clone or download the repository.
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## 🛠 How to Add a New Quiz using AI
+
+If you have a set of questions (from a pdf, text file, etc.) and you want to convert them into a new quiz in this app, you can use the prompt below with any AI (like ChatGPT, Claude, etc.) to do the heavy lifting for you.
+
+### Step 1: Copy this prompt and give it to an AI
+
+```text
+I want to add a new quiz to my React quiz app. 
+
+Here is my raw list of questions and answers:
+[PASTE YOUR QUESTIONS HERE]
+
+Please convert these questions into an array of Javascript objects that perfectly matches my app's existing format. 
+
+Follow these strict rules:
+1. The output should be a new exported array `export const NEW_QUIZ_QUESTIONS = [ ... ];`
+2. Each question object must have this exact shape:
+  {
+    id: 1, // Please increment this for each question sequentially
+    q: "The question text",
+    opts: ["Option 1", "Option 2", "Option 3", "Option 4"],
+    ans: 0, // The index of the correct option (0-3)
+    exp: "Explanation of why the answer is correct",
+    concept: "Primary Concept Name", // e.g., "Chemical Bonding"
+    subject: "Chemistry", // Must match the subject domain
+    ncert: true, // Boolean (guess based on whether it is standard curriculum)
+    ref: "Chapter or Topic Name"
+  }
+3. Generate the correct `ans` index based on the answers provided in my raw text.
+4. If an explanation is missing from my text, please generate a concise, accurate educational explanation for the `exp` property.
+5. Group the questions cleanly.
+6. After generating the array, please provide the exact code block I need to add to my `QUIZ_CATALOG` object to register this quiz, using a URL-safe ID like `"biology-mock-1"`.
+```
+
+### Step 2: Implement the AI's Output
+
+Once the AI replies with your parsed code:
+
+1. Open `src/data/questions.js`.
+2. Paste the parsed `const NEW_QUIZ_QUESTIONS = [...]` array anywhere near the top or bottom of the file (outside of existing arrays/objects).
+3. Scroll down to the `QUIZ_CATALOG` object at the very bottom of the file.
+4. Add the new dictionary entry provided by the AI into the `QUIZ_CATALOG`. For example:
+
+```javascript
+export const QUIZ_CATALOG = {
+  // ... your existing quizzes ...
+
+  "my-new-quiz": {
+    id: "my-new-quiz",
+    title: "My Awesome New Quiz",
+    description: "Covers important topics",
+    questions: NEW_QUIZ_QUESTIONS  // ← Point this to the array you just pasted
+  }
+};
+```
+5. Save the file, and your new quiz will automatically appear on the app's home screen!

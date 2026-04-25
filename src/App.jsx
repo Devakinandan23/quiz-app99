@@ -1,4 +1,5 @@
 import { useQuiz } from "./hooks/useQuiz";
+import Home from "./components/Home";
 import Dashboard from "./components/Dashboard";
 import Quiz from "./components/Quiz";
 import Analytics from "./components/Analytics";
@@ -9,8 +10,12 @@ import History from "./components/History";
 function App() {
   const quiz = useQuiz();
 
+  if (quiz.screen === "home") {
+    return <Home selectQuiz={quiz.selectQuiz} />;
+  }
+
   if (quiz.screen === "dashboard") {
-    return <Dashboard startQuiz={quiz.startQuiz} />;
+    return <Dashboard startQuiz={quiz.startQuiz} activeQuizId={quiz.activeQuizId} goHome={quiz.goHome} />;
   }
 
   if (quiz.screen === "quiz") {

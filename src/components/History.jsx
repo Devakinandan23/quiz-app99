@@ -192,7 +192,7 @@ export default function History({ history, clearHistory, deleteAttempt, viewAtte
               </span>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span style={{ fontSize: 12, color: "#9ca3af" }}>
-                  {formatDate(attempt.date)}
+                  {formatDate(attempt.createdAt)}
                 </span>
                 <button
                   onClick={(e) => handleDelete(e, attempt.id)}
@@ -233,7 +233,7 @@ export default function History({ history, clearHistory, deleteAttempt, viewAtte
 
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <span style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a" }}>
-                  {attempt.correct}/{attempt.totalQuestions}
+                  {attempt.score}/{attempt.totalQuestions}
                 </span>
                 <span style={{ fontSize: 12, color: "#9ca3af" }}>Correct</span>
               </div>
@@ -242,7 +242,7 @@ export default function History({ history, clearHistory, deleteAttempt, viewAtte
 
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <span style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a" }}>
-                  {formatTime(attempt.totalTime)}
+                  --
                 </span>
                 <span style={{ fontSize: 12, color: "#9ca3af" }}>Time</span>
               </div>

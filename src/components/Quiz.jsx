@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { SUBJECT_COLORS } from "../data/questions";
 
 const SECTION_MAP = {
   Physics:           { label: "Physics",           color: "#2563eb", bg: "#eff6ff" },
@@ -14,6 +13,7 @@ export default function Quiz({
   questionTimer, handleSelect, clearResponse, toggleMarkForReview,
   goToQuestion, prevQuestion, nextQuestion, finishQuiz,
   formatTime, exitQuiz, totalTimer,
+  submitLoading, submitError,
 }) {
   const q = quizQuestions[currentIdx];
   const selected = userAnswers[currentIdx] ?? null;
@@ -185,12 +185,12 @@ export default function Quiz({
 
             {/* OPTIONS - Radio button style */}
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {q.opts.map((opt, i) => {
-                const isSelected = i === selected;
+              {q.opts.map((opt) => {
+                const isSelected = opt.id === selected;
                 return (
                   <button
-                    key={i}
-                    onClick={() => handleSelect(i)}
+                    key={opt.id}
+                    onClick={() => handleSelect(opt.id)}
                     style={{
                       display: "flex", alignItems: "center", gap: 14,
                       padding: "14px 18px", textAlign: "left", fontSize: 15, lineHeight: 1.5,
@@ -215,7 +215,7 @@ export default function Quiz({
                         }} />
                       )}
                     </span>
-                    <span style={{ flex: 1 }}>{opt}</span>
+                    <span style={{ flex: 1 }}>{opt.text}</span>
                   </button>
                 );
               })}
@@ -336,15 +336,19 @@ export default function Quiz({
               </button>
               <button
                 onClick={finishQuiz}
+                disabled={submitLoading}
                 style={{
                   padding: "10px 20px", fontSize: 13, fontWeight: 700,
                   background: "#059669", color: "#fff", border: "1.5px solid #059669",
                   borderRadius: 8, cursor: "pointer", fontFamily: "inherit",
                 }}
               >
-                Submit Test
+                {submitLoading ? "Submitting..." : "Submit Test"}
               </button>
             </div>
+            {submitError && (
+              <p style={{ marginTop: 10, fontSize: 13, color: "#dc2626" }}>{submitError}</p>
+            )}
           </div>
         </div>
       )}

@@ -1,30 +1,20 @@
-import { useState, useEffect, useRef } from "react";
-import { QUIZ_CATALOG, QUESTIONS } from "../data/questions";
+import { useEffect, useRef, useState } from "react";
+import { api } from "../api/client";
 
-const getHistoryKey = (quizId) => `chemprep_history_${quizId}`;
-
-function loadHistory(quizId) {
-  if (!quizId) return [];
-  try {
-    const data = localStorage.getItem(getHistoryKey(quizId));
-    return data ? JSON.parse(data) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveHistory(quizId, history) {
-  if (!quizId) return;
-  try {
-    localStorage.setItem(getHistoryKey(quizId), JSON.stringify(history));
-  } catch {
-    // localStorage quota exceeded or unavailable — fail silently
-    // History won't persist but quiz results are still shown in-memory
-  }
-}
+const normalizeQuestion = (item) => ({
+  id: item.id,
+  q: item.question,
+  opts: item.options.map((opt) => ({ id: opt.id, text: opt.text })),
+  explanation: item.explanation,
+  concept: item.concept,
+  subject: item.subject,
+  ncert: item.ncert,
+  ref: item.ref,
+});
 
 export function useQuiz() {
   const [activeQuizId, setActiveQuizId] = useState(null);
+  const [activeQuizMeta, setActiveQuizMeta] = useState(null);
   const [screen, setScreen] = useState("home");
   const [answers, setAnswers] = useState([]);
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -36,97 +26,115 @@ export function useQuiz() {
   const [flashcardFlipped, setFlashcardFlipped] = useState(false);
   const [quizQuestions, setQuizQuestions] = useState([]);
   const [history, setHistory] = useState([]);
+  const [attemptSummary, setAttemptSummary] = useState(null);
 
-  // Exam-style state
-  const [userAnswers, setUserAnswers] = useState({}); // { questionIndex: selectedOptionIndex }
+  const [quizzes, setQuizzes] = useState([]);
+  const [quizzesLoading, setQuizzesLoading] = useState(false);
+  const [quizzesError, setQuizzesError] = useState("");
+  const [questionsLoading, setQuestionsLoading] = useState(false);
+  const [questionsError, setQuestionsError] = useState("");
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  const [userAnswers, setUserAnswers] = useState({});
   const [markedForReview, setMarkedForReview] = useState(new Set());
-  const [questionTimes, setQuestionTimes] = useState({}); // { questionIndex: seconds }
+  const [questionTimes, setQuestionTimes] = useState({});
 
   const timerRef = useRef(null);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const loadQuizzes = async () => {
+      setQuizzesLoading(true);
+      setQuizzesError("");
+      try {
+        const data = await api.getQuizzes();
+        if (!cancelled) {
+          setQuizzes(data);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setQuizzesError(error.message || "Failed to load quizzes.");
+        }
+      } finally {
+        if (!cancelled) {
+          setQuizzesLoading(false);
+        }
+      }
+    };
+
+    loadQuizzes();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const loadAttempts = async () => {
+    try {
+      const result = await api.getAttempts({ limit: 50, offset: 0 });
+      setHistory(result.items || []);
+    } catch {
+      setHistory([]);
+    }
+  };
+
+  useEffect(() => {
+    if (screen === "analytics" || screen === "history") {
+      loadAttempts();
+    }
+  }, [screen]);
+
+  useEffect(() => {
     if (quizActive) {
       timerRef.current = setInterval(() => {
-        setQuestionTimer(t => t + 1);
-        setTotalTimer(t => t + 1);
+        setQuestionTimer((t) => t + 1);
+        setTotalTimer((t) => t + 1);
       }, 1000);
     }
     return () => clearInterval(timerRef.current);
   }, [quizActive, currentIdx]);
 
-  // Save time when navigating away from a question
   const saveCurrentQuestionTime = () => {
-    setQuestionTimes(prev => ({
+    setQuestionTimes((prev) => ({
       ...prev,
       [currentIdx]: (prev[currentIdx] || 0) + questionTimer,
     }));
   };
 
-  // Compress answers for localStorage: only store qId, selected, time
-  // Everything else (concept, diff, ncert, correct, isCorrect, isUnanswered)
-  // can be rehydrated from QUESTIONS at read time
-  const compressAnswers = (answers) =>
-    answers.map(a => [a.qId, a.selected, a.time]); // [qId, selected|null, timeInSec]
-
-  const rehydrateAnswers = (compressed, questions) =>
-    compressed.map(([qId, selected, time]) => {
-      const q = questions.find(qq => qq.id === qId);
-      return {
-        qId, selected, time,
-        correct: q ? q.ans : 0,
-        isCorrect: q ? selected === q.ans : false,
-        isUnanswered: selected === null || selected === undefined,
-        concept: q ? q.concept : "Unknown",
-        subject: q ? q.subject : "Unknown",
-        ncert: q ? q.ncert : false,
-      };
-    });
-
-  const saveAttempt = (finalAnswers, finalTotalTimer) => {
-    if (!finalAnswers.length) return; // guard against empty quiz
-    const correct = finalAnswers.filter(a => a.isCorrect).length;
-    const attempt = {
-      id: Date.now(),
-      date: new Date().toISOString(),
-      totalQuestions: finalAnswers.length,
-      correct,
-      accuracy: Math.round((correct / finalAnswers.length) * 100),
-      totalTime: finalTotalTimer,
-      answers: compressAnswers(finalAnswers), // ~3KB instead of ~430KB
-    };
-    const updated = [attempt, ...history];
-    setHistory(updated);
-    saveHistory(activeQuizId, updated);
-  };
-
   const clearHistory = () => {
     setHistory([]);
-    localStorage.removeItem(getHistoryKey(activeQuizId));
   };
 
   const deleteAttempt = (attemptId) => {
-    const updated = history.filter(a => a.id !== attemptId);
-    setHistory(updated);
-    if (updated.length === 0) {
-      localStorage.removeItem(getHistoryKey(activeQuizId));
-    } else {
-      saveHistory(activeQuizId, updated);
+    setHistory((prev) => prev.filter((item) => item.id !== attemptId));
+  };
+
+  const selectQuiz = async (quizId) => {
+    const selectedQuiz = quizzes.find((quiz) => quiz.id === quizId);
+    if (!selectedQuiz) return;
+
+    setQuestionsLoading(true);
+    setQuestionsError("");
+
+    try {
+      const result = await api.getQuizQuestions(quizId, { limit: 200, offset: 0 });
+      setActiveQuizId(quizId);
+      setActiveQuizMeta(selectedQuiz);
+      setQuizQuestions((result.items || []).map(normalizeQuestion));
+      setScreen("dashboard");
+    } catch (error) {
+      setQuestionsError(error.message || "Failed to load questions.");
+    } finally {
+      setQuestionsLoading(false);
     }
   };
 
-  const selectQuiz = (quizId) => {
-    const catalogEntry = QUIZ_CATALOG[quizId];
-    if (!catalogEntry) return;
-
-    setActiveQuizId(quizId);
-    setQuizQuestions(catalogEntry.questions);
-    setHistory(loadHistory(quizId));
-    setScreen("dashboard");
-  };
-
   const startQuiz = () => {
-    if (!activeQuizId) return;
+    if (!activeQuizId || quizQuestions.length === 0) return;
     setAnswers([]);
+    setAttemptSummary(null);
     setCurrentIdx(0);
     setUserAnswers({});
     setMarkedForReview(new Set());
@@ -134,16 +142,17 @@ export function useQuiz() {
     setQuizDone(false);
     setQuestionTimer(0);
     setTotalTimer(0);
+    setSubmitError("");
     setQuizActive(true);
     setScreen("quiz");
   };
 
-  const handleSelect = (optIdx) => {
-    setUserAnswers(prev => ({ ...prev, [currentIdx]: optIdx }));
+  const handleSelect = (optionId) => {
+    setUserAnswers((prev) => ({ ...prev, [currentIdx]: optionId }));
   };
 
   const clearResponse = () => {
-    setUserAnswers(prev => {
+    setUserAnswers((prev) => {
       const next = { ...prev };
       delete next[currentIdx];
       return next;
@@ -151,7 +160,7 @@ export function useQuiz() {
   };
 
   const toggleMarkForReview = () => {
-    setMarkedForReview(prev => {
+    setMarkedForReview((prev) => {
       const next = new Set(prev);
       if (next.has(currentIdx)) next.delete(currentIdx);
       else next.add(currentIdx);
@@ -174,106 +183,92 @@ export function useQuiz() {
     if (currentIdx < quizQuestions.length - 1) goToQuestion(currentIdx + 1);
   };
 
-  const finishQuiz = () => {
+  const finishQuiz = async () => {
     clearInterval(timerRef.current);
     saveCurrentQuestionTime();
 
-    // Build final answers array from userAnswers
-    const finalTimes = { ...questionTimes, [currentIdx]: (questionTimes[currentIdx] || 0) + questionTimer };
-    const finalAnswers = quizQuestions.map((q, idx) => {
-      const selected = userAnswers[idx] ?? null;
-      return {
-        qId: q.id,
-        selected,
-        correct: q.ans,
-        isCorrect: selected === q.ans,
-        isUnanswered: selected === null,
-        time: finalTimes[idx] || 0,
-        concept: q.concept,
-        subject: q.subject,
-        ncert: q.ncert,
-      };
-    });
+    const unanswered = quizQuestions.filter((_, idx) => userAnswers[idx] === undefined);
+    if (unanswered.length > 0) {
+      setSubmitError(
+        `Please answer all questions before submission. ${unanswered.length} remaining.`,
+      );
+      return;
+    }
 
-    setAnswers(finalAnswers);
-    setQuizDone(true);
-    setQuizActive(false);
-    saveAttempt(finalAnswers, totalTimer);
-    setScreen("analytics");
+    const responses = quizQuestions.map((q, idx) => ({
+      questionId: q.id,
+      optionId: userAnswers[idx],
+    }));
+
+    setSubmitLoading(true);
+    setSubmitError("");
+
+    try {
+      const result = await api.submitAttempt({
+        quizId: activeQuizId,
+        responses,
+      });
+
+      setAttemptSummary(result);
+      setQuizDone(true);
+      setQuizActive(false);
+      setAnswers(
+        quizQuestions.map((q, idx) => ({
+          qId: q.id,
+          selected: userAnswers[idx] ?? null,
+          time: questionTimes[idx] || 0,
+          concept: q.concept,
+          subject: q.subject,
+          ncert: q.ncert,
+          isUnanswered: userAnswers[idx] === undefined,
+          isCorrect: false,
+          question: q,
+        })),
+      );
+      await loadAttempts();
+      setScreen("analytics");
+    } catch (error) {
+      setSubmitError(error.message || "Failed to submit attempt.");
+    } finally {
+      setSubmitLoading(false);
+    }
   };
 
-  const getConceptStats = () => {
-    const stats = {};
-    answers.forEach(a => {
-      if (!stats[a.concept]) stats[a.concept] = { total: 0, correct: 0, totalTime: 0, unanswered: 0 };
-      stats[a.concept].total++;
-      if (a.isCorrect) stats[a.concept].correct++;
-      if (a.isUnanswered) stats[a.concept].unanswered++;
-      stats[a.concept].totalTime += a.time;
-    });
-    return Object.entries(stats).map(([concept, s]) => ({
-      concept, accuracy: Math.round((s.correct / s.total) * 100),
-      total: s.total, correct: s.correct, unanswered: s.unanswered,
-      avgTime: Math.round(s.totalTime / s.total)
-    })).sort((a, b) => a.accuracy - b.accuracy);
-  };
+  const getConceptStats = () => [];
 
-  const getMistakePatterns = () => {
-    const wrong = answers.filter(a => !a.isCorrect && !a.isUnanswered);
-    const avgTime = answers.length ? answers.reduce((s, a) => s + a.time, 0) / answers.length : 15;
-    const guessing = wrong.filter(a => a.time < avgTime * 0.5).length;
-    const confusion = wrong.filter(a => a.time >= avgTime * 0.5).length;
-    return { guessing, confusion, total: wrong.length };
-  };
+  const getMistakePatterns = () => ({ guessing: 0, confusion: 0, total: 0 });
 
-  const getWrongQuestions = () => {
-    return answers.filter(a => !a.isCorrect && !a.isUnanswered).map(a => quizQuestions.find(q => q.id === a.qId)).filter(Boolean);
-  };
+  const getWrongQuestions = () => [];
 
-  const getUnansweredQuestions = () => {
-    return answers.filter(a => a.isUnanswered).map(a => quizQuestions.find(q => q.id === a.qId)).filter(Boolean);
-  };
+  const getUnansweredQuestions = () =>
+    answers
+      .filter((a) => a.isUnanswered)
+      .map((a) => quizQuestions.find((q) => q.id === a.qId))
+      .filter(Boolean);
 
   const getReviewQuestions = (filter) => {
-    if (filter === "wrong") return getWrongQuestions();
     if (filter === "unanswered") return getUnansweredQuestions();
-    // "all" = wrong + unanswered
-    return answers.filter(a => !a.isCorrect).map(a => {
-      const q = quizQuestions.find(qq => qq.id === a.qId);
-      return q ? { ...q, _isUnanswered: a.isUnanswered } : null;
-    }).filter(Boolean);
+    return [];
   };
 
-  const overallAccuracy = answers.length ? Math.round(answers.filter(a => a.isCorrect).length / answers.length * 100) : 0;
-  const avgTimePerQ = answers.length ? Math.round(answers.reduce((s, a) => s + a.time, 0) / answers.length) : 0;
-  const ncertAnswers = answers.filter(a => a.ncert);
-  const ncertAccuracy = ncertAnswers.length ? Math.round(ncertAnswers.filter(a => a.isCorrect).length / ncertAnswers.length * 100) : 0;
-  const unansweredCount = answers.filter(a => a.isUnanswered).length;
+  const overallAccuracy = attemptSummary?.accuracy ?? 0;
+  const avgTimePerQ = answers.length
+    ? Math.round(answers.reduce((sum, a) => sum + a.time, 0) / answers.length)
+    : 0;
+  const ncertAnswers = answers.filter((a) => a.ncert);
+  const ncertAccuracy = 0;
+  const unansweredCount = answers.filter((a) => a.isUnanswered).length;
 
   const conceptStats = getConceptStats();
   const weakest = conceptStats.length ? conceptStats[0] : null;
   const strongest = conceptStats.length ? conceptStats[conceptStats.length - 1] : null;
 
   const formatTime = (s) => {
-    const safe = Math.max(0, Math.floor(s)) || 0; // clamp negatives, NaN, floats
+    const safe = Math.max(0, Math.floor(s)) || 0;
     return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, "0")}`;
   };
 
-  const retryWrong = () => {
-    const wrongIds = getWrongQuestions().map(q => q.id);
-    const wrongQs = quizQuestions.filter(q => wrongIds.includes(q.id));
-    setQuizQuestions(wrongQs);
-    setAnswers([]);
-    setCurrentIdx(0);
-    setUserAnswers({});
-    setMarkedForReview(new Set());
-    setQuestionTimes({});
-    setQuizDone(false);
-    setQuestionTimer(0);
-    setTotalTimer(0);
-    setQuizActive(true);
-    setScreen("quiz");
-  };
+  const retryWrong = () => {};
 
   const openFlashcards = () => {
     setFlashcardIdx(0);
@@ -284,8 +279,6 @@ export function useQuiz() {
   const exitQuiz = () => {
     clearInterval(timerRef.current);
     setQuizActive(false);
-    setActiveQuizId(null);
-    setHistory([]);
     setAnswers([]);
     setCurrentIdx(0);
     setUserAnswers({});
@@ -293,65 +286,109 @@ export function useQuiz() {
     setQuestionTimes({});
     setQuestionTimer(0);
     setTotalTimer(0);
+    setSubmitError("");
     setScreen("home");
   };
 
-  // DEV SHORTCUT: call window.__devSkip() in browser console to jump to results
-  useEffect(() => {
-    if (import.meta.env.DEV) {
-      window.__devSkip = () => {
-        const fakeAnswers = quizQuestions.map(q => {
-          const skip = Math.random() > 0.85;
-          const sel = skip ? null : Math.floor(Math.random() * 4);
-          return {
-            qId: q.id, selected: sel, correct: q.ans,
-            isCorrect: sel === q.ans, isUnanswered: skip,
-            time: Math.floor(Math.random() * 30) + 3,
-            concept: q.concept, subject: q.subject, ncert: q.ncert,
-          };
-        });
-        setAnswers(fakeAnswers);
-        setTotalTimer(420);
-        setScreen("analytics");
-      };
+  const viewAttempt = async (attempt) => {
+    try {
+      const detail = await api.getAttemptById(attempt.id);
+      const loadedAnswers = detail.responses.map((item) => ({
+        qId: item.questionId,
+        selected: item.optionId,
+        isCorrect: false,
+        isUnanswered: false,
+        concept: item.question?.concept || "",
+        subject: item.question?.subject || "",
+        ncert: false,
+        time: 0,
+        question: {
+          id: item.questionId,
+          q: item.question.question,
+          explanation: item.question.explanation,
+          opts: item.question.options,
+          concept: item.question.concept || "",
+          subject: item.question.subject || "",
+          ncert: false,
+          ref: "",
+        },
+      }));
+      setAnswers(loadedAnswers);
+      setAttemptSummary({
+        score: detail.score,
+        accuracy: detail.accuracy,
+        totalQuestions: detail.totalQuestions,
+      });
+      setScreen("analytics");
+    } catch {
+      setSubmitError("Failed to load attempt details.");
     }
-  }, []);
-
-  const viewAttempt = (attempt) => {
-    // Handle both compressed [qId, selected, time] and legacy full-object formats
-    const rawAnswers = attempt.answers || [];
-    const isCompressed = rawAnswers.length > 0 && Array.isArray(rawAnswers[0]);
-    const hydrated = isCompressed
-      ? rehydrateAnswers(rawAnswers, quizQuestions)
-      : rawAnswers;
-    setAnswers(hydrated);
-    setTotalTimer(attempt.totalTime);
-    setScreen("analytics");
   };
 
   const goHome = () => {
     setActiveQuizId(null);
+    setActiveQuizMeta(null);
+    setQuizQuestions([]);
     setHistory([]);
     setScreen("home");
   };
 
   return {
     activeQuizId,
-    screen, setScreen,
-    answers, currentIdx, quizDone,
-    questionTimer, totalTimer, quizActive,
-    flashcardIdx, setFlashcardIdx,
-    flashcardFlipped, setFlashcardFlipped,
+    activeQuizMeta,
+    screen,
+    setScreen,
+    answers,
+    currentIdx,
+    quizDone,
+    questionTimer,
+    totalTimer,
+    quizActive,
+    flashcardIdx,
+    setFlashcardIdx,
+    flashcardFlipped,
+    setFlashcardFlipped,
     quizQuestions,
-    userAnswers, markedForReview,
-    history, clearHistory, deleteAttempt, viewAttempt,
-    selectQuiz, goHome, startQuiz, handleSelect, clearResponse,
-    toggleMarkForReview, goToQuestion,
-    prevQuestion, nextQuestion, finishQuiz,
-    getConceptStats, getMistakePatterns, getWrongQuestions, getUnansweredQuestions, getReviewQuestions,
-    overallAccuracy, avgTimePerQ, ncertAnswers, ncertAccuracy,
+    userAnswers,
+    markedForReview,
+    history,
+    quizzes,
+    quizzesLoading,
+    quizzesError,
+    questionsLoading,
+    questionsError,
+    submitLoading,
+    submitError,
+    attemptSummary,
+    clearHistory,
+    deleteAttempt,
+    viewAttempt,
+    selectQuiz,
+    goHome,
+    startQuiz,
+    handleSelect,
+    clearResponse,
+    toggleMarkForReview,
+    goToQuestion,
+    prevQuestion,
+    nextQuestion,
+    finishQuiz,
+    getConceptStats,
+    getMistakePatterns,
+    getWrongQuestions,
+    getUnansweredQuestions,
+    getReviewQuestions,
+    overallAccuracy,
+    avgTimePerQ,
+    ncertAnswers,
+    ncertAccuracy,
     unansweredCount,
-    conceptStats, weakest, strongest,
-    formatTime, retryWrong, openFlashcards, exitQuiz,
+    conceptStats,
+    weakest,
+    strongest,
+    formatTime,
+    retryWrong,
+    openFlashcards,
+    exitQuiz,
   };
 }

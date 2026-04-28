@@ -17,6 +17,7 @@ model Quiz {
   title       String
   description String?
   questions   Question[]
+  attempts    Attempt[]
 }
 
 model Question {
@@ -31,6 +32,9 @@ model Question {
 
   quiz        Quiz     @relation(fields: [quizId], references: [id])
   options     Option[]
+  responses   Response[]
+
+  @@index([quizId])
 }
 
 model Option {
@@ -40,4 +44,40 @@ model Option {
   isCorrect   Boolean  @default(false)
 
   question    Question @relation(fields: [questionId], references: [id])
+  responses   Response[]
+
+  @@index([questionId])
+}
+
+model Attempt {
+  id             Int        @id @default(autoincrement())
+  quizId         Int
+  submissionHash String     @unique
+  score          Int
+  accuracy       Float
+  totalQuestions Int
+  createdAt      DateTime   @default(now())
+
+  quiz           Quiz       @relation(fields: [quizId], references: [id])
+  responses      Response[]
+
+  @@index([quizId])
+  @@index([createdAt])
+}
+
+model Response {
+  id         Int      @id @default(autoincrement())
+  attemptId  Int
+  questionId Int
+  optionId   Int
+  createdAt  DateTime @default(now())
+
+  attempt    Attempt  @relation(fields: [attemptId], references: [id])
+  question   Question @relation(fields: [questionId], references: [id])
+  option     Option   @relation(fields: [optionId], references: [id])
+
+  @@unique([attemptId, questionId])
+  @@index([attemptId])
+  @@index([questionId])
+  @@index([optionId])
 }

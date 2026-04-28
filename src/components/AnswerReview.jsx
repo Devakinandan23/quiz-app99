@@ -1,14 +1,18 @@
 import { useState } from "react";
 import { S } from "../styles/styles";
-import { QUESTIONS, SUBJECT_COLORS } from "../data/questions";
+
+const SUBJECT_COLORS = {
+  Physics: "#2563eb",
+  Chemistry: "#059669",
+  Maths: "#7c3aed",
+  English: "#d97706",
+  "Logical Reasoning": "#dc2626",
+};
 
 export default function AnswerReview({ answers, setScreen }) {
   const [filter, setFilter] = useState("all");
 
-  const enriched = answers.map(a => {
-    const q = QUESTIONS.find(question => question.id === a.qId);
-    return { ...a, question: q };
-  }).filter(a => a.question);
+  const enriched = answers.filter((a) => a.question);
 
   const filtered = filter === "all"
     ? enriched
@@ -126,22 +130,19 @@ export default function AnswerReview({ answers, setScreen }) {
               <p style={{ fontSize: 15, fontWeight: 500, lineHeight: 1.6, marginBottom: 14 }}>{q.q}</p>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
-                {q.opts.map((opt, i) => {
-                  const isCorrectOpt = i === q.ans;
-                  const isUserPick = i === a.selected;
+                {(q.opts || []).map((opt) => {
+                  const isUserPick = opt.id === a.selected;
                   let bg = "#f9fafb";
                   let border = "#e5e5e3";
                   let color = "#6b7280";
                   let fw = "400";
 
-                  if (isCorrectOpt) {
-                    bg = "#ecfdf5"; border = "#059669"; color = "#059669"; fw = "600";
-                  } else if (isUserPick && !a.isCorrect) {
+                  if (isUserPick && !a.isCorrect) {
                     bg = "#fef2f2"; border = "#dc2626"; color = "#dc2626"; fw = "500";
                   }
 
                   return (
-                    <div key={i} style={{
+                    <div key={opt.id} style={{
                       padding: "10px 14px", fontSize: 14, lineHeight: 1.5,
                       background: bg, border: `1.5px solid ${border}`, borderRadius: 8,
                       color, fontWeight: fw, display: "flex", alignItems: "center", gap: 8,
@@ -149,20 +150,17 @@ export default function AnswerReview({ answers, setScreen }) {
                       {/* Radio circle indicator */}
                       <span style={{
                         width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
-                        border: `2px solid ${isCorrectOpt ? "#059669" : isUserPick ? "#dc2626" : "#d1d5db"}`,
+                        border: `2px solid ${isUserPick ? "#dc2626" : "#d1d5db"}`,
                         display: "flex", alignItems: "center", justifyContent: "center",
                       }}>
-                        {(isCorrectOpt || isUserPick) && (
+                        {isUserPick && (
                           <span style={{
                             width: 10, height: 10, borderRadius: "50%",
-                            background: isCorrectOpt ? "#059669" : "#dc2626",
+                            background: "#dc2626",
                           }} />
                         )}
                       </span>
-                      <span style={{ flex: 1 }}>{opt}</span>
-                      {isCorrectOpt && (
-                        <span style={{ fontSize: 11, fontWeight: 600, color: "#059669" }}>CORRECT</span>
-                      )}
+                      <span style={{ flex: 1 }}>{opt.text}</span>
                       {isUserPick && !a.isCorrect && !a.isUnanswered && (
                         <span style={{ fontSize: 11, fontWeight: 600, color: "#dc2626" }}>YOUR ANSWER</span>
                       )}
@@ -179,7 +177,7 @@ export default function AnswerReview({ answers, setScreen }) {
                 borderRadius: 8, padding: 12,
               }}>
                 <p style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 4 }}>Explanation</p>
-                <p style={{ fontSize: 13, lineHeight: 1.6, color: "#4b5563", margin: 0 }}>{q.exp}</p>
+                <p style={{ fontSize: 13, lineHeight: 1.6, color: "#4b5563", margin: 0 }}>{q.explanation || "No explanation available."}</p>
               </div>
             </div>
           );

@@ -9,10 +9,8 @@ const RULES = [
   "Questions are grouped by subject: Chemistry, Physics, Maths, English, Logical Reasoning.",
 ];
 
-import { QUIZ_CATALOG } from "../data/questions";
-
-export default function Dashboard({ startQuiz, activeQuizId, goHome }) {
-  const quiz = QUIZ_CATALOG[activeQuizId];
+export default function Dashboard({ startQuiz, activeQuizMeta, goHome, questionsLoading, questionsError, questionCount }) {
+  const quiz = activeQuizMeta;
   if (!quiz) return null;
 
   return (
@@ -21,7 +19,15 @@ export default function Dashboard({ startQuiz, activeQuizId, goHome }) {
         <div style={{ textAlign: "center", marginBottom: 36 }}>
           <h1 style={{ ...S.title, fontSize: 28 }}>{quiz.title}</h1>
           <p style={S.subtitle}>{quiz.description}</p>
+          <p style={{ fontSize: 13, color: "#6b7280", marginTop: 6 }}>{questionCount} questions</p>
         </div>
+
+        {questionsLoading && (
+          <p style={{ textAlign: "center", color: "#6b7280", marginBottom: 12 }}>Loading questions...</p>
+        )}
+        {questionsError && (
+          <p style={{ textAlign: "center", color: "#dc2626", marginBottom: 12 }}>{questionsError}</p>
+        )}
 
         <div style={{
           background: "#fff", border: "1px solid #e5e5e3", borderRadius: 12,
@@ -43,8 +49,9 @@ export default function Dashboard({ startQuiz, activeQuizId, goHome }) {
             Back
           </button>
           <button 
-            style={{ ...S.primaryBtn, padding: "14px 48px", fontSize: 17 }} 
+            style={{ ...S.primaryBtn, padding: "14px 48px", fontSize: 17 }}
             onClick={startQuiz}
+            disabled={questionsLoading || questionCount === 0}
           >
             Start Test
           </button>

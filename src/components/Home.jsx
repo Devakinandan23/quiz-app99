@@ -1,7 +1,5 @@
 import { S } from "../styles/styles";
-import { QUIZ_CATALOG } from "../data/questions";
-
-export default function Home({ selectQuiz }) {
+export default function Home({ selectQuiz, quizzes, loading, error }) {
   return (
     <div style={S.page}>
       <div style={S.container}>
@@ -10,8 +8,16 @@ export default function Home({ selectQuiz }) {
           <p style={S.subtitle}>Select a quiz to start</p>
         </div>
 
+        {loading && (
+          <p style={{ textAlign: "center", color: "#6b7280" }}>Loading quizzes...</p>
+        )}
+
+        {error && (
+          <p style={{ textAlign: "center", color: "#dc2626" }}>{error}</p>
+        )}
+
         <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 400, margin: "0 auto" }}>
-          {Object.values(QUIZ_CATALOG).map(quiz => (
+          {quizzes.map((quiz) => (
             <div key={quiz.id} style={{ border: "1px solid #e5e5e3", borderRadius: 8, padding: 16, background: "#fff", display: "flex", flexDirection: "column", gap: 12 }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: 18, color: "#1a1a1a" }}>{quiz.title}</h3>
@@ -20,8 +26,9 @@ export default function Home({ selectQuiz }) {
               <button
                 style={{ ...S.primaryBtn, width: "100%", padding: "10px 0" }}
                 onClick={() => selectQuiz(quiz.id)}
+                disabled={loading}
               >
-                View Details ({quiz.questions.length} Qs)
+                View Details
               </button>
             </div>
           ))}

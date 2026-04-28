@@ -1,7 +1,15 @@
 import { useState } from "react";
 import { S } from "../styles/styles";
 import { exportAsCSV, exportAsPDF } from "../utils/exportResults";
-import { SUBJECTS, SUBJECT_COLORS } from "../data/questions";
+
+const SUBJECTS = ["Physics", "Chemistry", "Maths", "English", "Logical Reasoning"];
+const SUBJECT_COLORS = {
+  Physics: "#2563eb",
+  Chemistry: "#059669",
+  Maths: "#7c3aed",
+  English: "#d97706",
+  "Logical Reasoning": "#dc2626",
+};
 
 export default function Analytics({
   answers, overallAccuracy, avgTimePerQ, ncertAccuracy, ncertAnswers,
@@ -97,7 +105,7 @@ export default function Analytics({
               {overallAccuracy}%
             </span>
             <span style={{ fontSize: 12, color: "#9ca3af" }}>
-              {answers.filter(a => a.isCorrect).length}/{answers.length} correct
+              {(typeof history?.[0]?.score === "number" ? history[0].score : answers.filter(a => a.isCorrect).length)}/{answers.length || (history?.[0]?.totalQuestions || 0)} correct
             </span>
             {unansweredCount > 0 && (
               <span style={{ fontSize: 11, color: "#d97706" }}>

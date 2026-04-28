@@ -1,21 +1,20 @@
 import 'dotenv/config'
 import express from 'express'
-import { PrismaClient } from '../generated/prisma/client.js'
-import { PrismaPg } from '@prisma/adapter-pg'
+import cors from 'cors'
+import { attemptRouter } from './routes/attempt.routes.js'
+import { quizRouter } from './routes/quiz.routes.js'
 
 const app = express()
+app.use(cors())
 app.use(express.json())
 
-const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
-})
+app.use(quizRouter)
+app.use(attemptRouter)
 
-app.get('/questions', async (req, res) => {
-  const questions = await prisma.question.findMany({
-    include: { options: true },
-    take: 10,
-  })
-  res.json(questions)
+app.use((error: Error & { status?: number }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  const status = error.status ?? 500
+  const message = status >= 500 ? 'Internal server error.' : error.message
+  res.status(status).json({ message })
 })
 
 app.listen(3000, () => console.log('Server running at http://localhost:3000'))

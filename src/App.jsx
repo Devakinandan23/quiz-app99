@@ -11,11 +11,27 @@ function App() {
   const quiz = useQuiz();
 
   if (quiz.screen === "home") {
-    return <Home selectQuiz={quiz.selectQuiz} />;
+    return (
+      <Home
+        selectQuiz={quiz.selectQuiz}
+        quizzes={quiz.quizzes}
+        loading={quiz.quizzesLoading}
+        error={quiz.quizzesError}
+      />
+    );
   }
 
   if (quiz.screen === "dashboard") {
-    return <Dashboard startQuiz={quiz.startQuiz} activeQuizId={quiz.activeQuizId} goHome={quiz.goHome} />;
+    return (
+      <Dashboard
+        startQuiz={quiz.startQuiz}
+        activeQuizMeta={quiz.activeQuizMeta}
+        goHome={quiz.goHome}
+        questionsLoading={quiz.questionsLoading}
+        questionsError={quiz.questionsError}
+        questionCount={quiz.quizQuestions.length}
+      />
+    );
   }
 
   if (quiz.screen === "quiz") {
@@ -36,6 +52,8 @@ function App() {
         finishQuiz={quiz.finishQuiz}
         exitQuiz={quiz.exitQuiz}
         formatTime={quiz.formatTime}
+        submitLoading={quiz.submitLoading}
+        submitError={quiz.submitError}
       />
     );
   }

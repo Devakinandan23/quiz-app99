@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "build": "tsc -b",
     "dev": "tsc -b && node dist/src/index.js",
     "db:seed": "tsx prisma/seed.ts"
   },

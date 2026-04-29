@@ -204,16 +204,25 @@ export function useQuiz() {
       setAttemptSummary(result);
       setQuizDone(true);
       setQuizActive(false);
+      
+      // Build a map of questionId -> isCorrect from the backend evaluations
+      const responseMap = {};
+      if (Array.isArray(result.responses)) {
+        result.responses.forEach(r => {
+          responseMap[r.questionId] = r.isCorrect;
+        });
+      }
+
       setAnswers(
         quizQuestions.map((q, idx) => ({
           qId: q.id,
           selected: userAnswers[idx] ?? null,
           time: questionTimes[idx] || 0,
-          concept: q.concept,
-          subject: q.subject,
-          ncert: q.ncert,
+          concept: q.concept || "",
+          subject: q.subject || "",
+          ncert: q.ncert || false,
           isUnanswered: userAnswers[idx] === undefined,
-          isCorrect: false,
+          isCorrect: responseMap[q.id] === true,
           question: q,
         })),
       );
@@ -226,11 +235,36 @@ export function useQuiz() {
     }
   };
 
-  const getConceptStats = () => [];
+  const getConceptStats = () => {
+    const conceptMap = {};
+    answers.forEach((a) => {
+      if (!a.concept) return;
+      if (!conceptMap[a.concept]) {
+        conceptMap[a.concept] = { concept: a.concept, correct: 0, total: 0 };
+      }
+      conceptMap[a.concept].total++;
+      if (a.isCorrect) conceptMap[a.concept].correct++;
+    });
+    return Object.values(conceptMap)
+      .map((c) => ({ ...c, accuracy: Math.round((c.correct / c.total) * 100) }))
+      .sort((a, b) => a.accuracy - b.accuracy);
+  };
 
-  const getMistakePatterns = () => ({ guessing: 0, confusion: 0, total: 0 });
+  const getMistakePatterns = () => {
+    const wrong = answers.filter((a) => !a.isCorrect && !a.isUnanswered);
+    const avgTime = answers.length
+      ? answers.reduce((sum, a) => sum + a.time, 0) / answers.length
+      : 0;
+    const guessing = wrong.filter((a) => a.time < avgTime * 0.5).length;
+    const confusion = wrong.filter((a) => a.time > avgTime * 1.5).length;
+    return { guessing, confusion, total: wrong.length };
+  };
 
-  const getWrongQuestions = () => [];
+  const getWrongQuestions = () =>
+    answers
+      .filter((a) => !a.isCorrect && !a.isUnanswered)
+      .map((a) => a.question)
+      .filter(Boolean);
 
   const getUnansweredQuestions = () =>
     answers
@@ -248,7 +282,9 @@ export function useQuiz() {
     ? Math.round(answers.reduce((sum, a) => sum + a.time, 0) / answers.length)
     : 0;
   const ncertAnswers = answers.filter((a) => a.ncert);
-  const ncertAccuracy = 0;
+  const ncertAccuracy = ncertAnswers.length
+    ? Math.round(ncertAnswers.filter((a) => a.isCorrect).length / ncertAnswers.length * 100)
+    : 0;
   const unansweredCount = answers.filter((a) => a.isUnanswered).length;
 
   const conceptStats = getConceptStats();
@@ -285,26 +321,32 @@ export function useQuiz() {
   const viewAttempt = async (attempt) => {
     try {
       const detail = await api.getAttemptById(attempt.id);
-      const loadedAnswers = detail.responses.map((item) => ({
-        qId: item.questionId,
-        selected: item.optionId,
-        isCorrect: false,
-        isUnanswered: false,
-        concept: item.question?.concept || "",
-        subject: item.question?.subject || "",
-        ncert: false,
-        time: 0,
-        question: {
-          id: item.questionId,
-          q: item.question.question,
-          explanation: item.question.explanation,
-          opts: item.question.options,
-          concept: item.question.concept || "",
-          subject: item.question.subject || "",
-          ncert: false,
-          ref: "",
-        },
-      }));
+      const loadedAnswers = detail.responses.map((item) => {
+        // Determine isCorrect by finding which option is marked correct and
+        // comparing it to what the user selected.
+        const correctOption = item.question?.options?.find((o) => o.isCorrect);
+        const isCorrect = correctOption ? correctOption.id === item.optionId : false;
+        return {
+          qId: item.questionId,
+          selected: item.optionId,
+          isCorrect,
+          isUnanswered: false,
+          concept: item.question?.concept || "",
+          subject: item.question?.subject || "",
+          ncert: item.question?.ncert || false,
+          time: 0,
+          question: {
+            id: item.questionId,
+            q: item.question.question,
+            explanation: item.question.explanation,
+            opts: item.question.options,
+            concept: item.question.concept || "",
+            subject: item.question.subject || "",
+            ncert: item.question.ncert || false,
+            ref: "",
+          },
+        };
+      });
       setAnswers(loadedAnswers);
       setAttemptSummary({
         score: detail.score,

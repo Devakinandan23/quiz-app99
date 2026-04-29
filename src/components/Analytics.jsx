@@ -141,26 +141,30 @@ export default function Analytics({
         <div style={{ marginBottom: 32 }}>
           <h2 style={S.sectionTitle}>Concept Breakdown</h2>
           <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>Where you're strong and where you need work</p>
-          {conceptStats.map(cs => (
-            <div key={cs.concept} style={{ marginBottom: 14 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <span style={{ fontSize: 14, fontWeight: 500 }}>{cs.concept}</span>
-                <span style={{
-                  fontSize: 13, fontWeight: 600,
-                  color: cs.accuracy >= 70 ? "#059669" : cs.accuracy >= 40 ? "#d97706" : "#dc2626"
-                }}>
-                  {cs.accuracy}% <span style={{ fontWeight: 400, color: "#9ca3af" }}>({cs.correct}/{cs.total})</span>
-                </span>
+          {conceptStats.length === 0 ? (
+            <p style={{ fontSize: 13, color: "#9ca3af", fontStyle: "italic" }}>No concept data available for this quiz.</p>
+          ) : (
+            conceptStats.map(cs => (
+              <div key={cs.concept} style={{ marginBottom: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                  <span style={{ fontSize: 14, fontWeight: 500 }}>{cs.concept}</span>
+                  <span style={{
+                    fontSize: 13, fontWeight: 600,
+                    color: cs.accuracy >= 70 ? "#059669" : cs.accuracy >= 40 ? "#d97706" : "#dc2626"
+                  }}>
+                    {cs.accuracy}% <span style={{ fontWeight: 400, color: "#9ca3af" }}>({cs.correct}/{cs.total})</span>
+                  </span>
+                </div>
+                <div style={{ height: 8, background: "#f3f4f6", borderRadius: 4, overflow: "hidden" }}>
+                  <div style={{
+                    height: "100%", borderRadius: 4, transition: "width 0.5s",
+                    width: `${cs.accuracy}%`,
+                    background: cs.accuracy >= 70 ? "#059669" : cs.accuracy >= 40 ? "#d97706" : "#dc2626"
+                  }} />
+                </div>
               </div>
-              <div style={{ height: 8, background: "#f3f4f6", borderRadius: 4, overflow: "hidden" }}>
-                <div style={{
-                  height: "100%", borderRadius: 4, transition: "width 0.5s",
-                  width: `${cs.accuracy}%`,
-                  background: cs.accuracy >= 70 ? "#059669" : cs.accuracy >= 40 ? "#d97706" : "#dc2626"
-                }} />
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
 
         {mistakes.total > 0 && (
@@ -188,25 +192,36 @@ export default function Analytics({
 
         <div style={{ marginBottom: 32 }}>
           <h2 style={S.sectionTitle}>Subject Performance</h2>
-          {SUBJECTS.map(subject => {
-            const sAnswers = answers.filter(a => a.subject === subject);
-            if (!sAnswers.length) return null;
-            const sAcc = Math.round(sAnswers.filter(a => a.isCorrect).length / sAnswers.length * 100);
-            const color = SUBJECT_COLORS[subject] || "#6b7280";
-            return (
-              <div key={subject} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
-                <span style={{ width: 120, fontSize: 13, fontWeight: 500 }}>{subject}</span>
-                <div style={{ flex: 1, height: 8, background: "#f3f4f6", borderRadius: 4, overflow: "hidden" }}>
-                  <div style={{
-                    height: "100%", borderRadius: 4,
-                    width: `${sAcc}%`,
-                    background: color,
-                  }} />
-                </div>
-                <span style={{ fontSize: 13, fontWeight: 600, width: 40, textAlign: "right" }}>{sAcc}%</span>
-              </div>
+          {(() => {
+            const subjectRows = SUBJECTS
+              .map(subject => {
+                const sAnswers = answers.filter(a => a.subject === subject);
+                if (!sAnswers.length) return null;
+                const sAcc = Math.round(sAnswers.filter(a => a.isCorrect).length / sAnswers.length * 100);
+                const color = SUBJECT_COLORS[subject] || "#6b7280";
+                return (
+                  <div key={subject} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                    <span style={{ width: 130, fontSize: 13, fontWeight: 500 }}>{subject}</span>
+                    <div style={{ flex: 1, height: 8, background: "#f3f4f6", borderRadius: 4, overflow: "hidden" }}>
+                      <div style={{
+                        height: "100%", borderRadius: 4,
+                        width: `${sAcc}%`,
+                        background: color,
+                        transition: "width 0.5s",
+                      }} />
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 600, width: 56, textAlign: "right" }}>
+                      {sAcc}% <span style={{ fontWeight: 400, color: "#9ca3af", fontSize: 11 }}>({sAnswers.filter(a => a.isCorrect).length}/{sAnswers.length})</span>
+                    </span>
+                  </div>
+                );
+              })
+              .filter(Boolean);
+
+            return subjectRows.length > 0 ? subjectRows : (
+              <p style={{ fontSize: 13, color: "#9ca3af", fontStyle: "italic" }}>No subject data available for this quiz.</p>
             );
-          })}
+          })()}
         </div>
 
         {wrongQs.length > 0 && (
@@ -215,6 +230,8 @@ export default function Analytics({
             <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>{wrongQs.length} questions to review</p>
             {wrongQs.map((wq) => {
               const ans = answers.find(a => a.qId === wq.id);
+              const userOption = wq.opts?.find(opt => opt.id === ans?.selected);
+              const correctOption = wq.opts?.[0];
               return (
                 <div key={wq.id} style={{
                   background: "#fff", border: "1px solid #e5e5e3",
@@ -222,15 +239,21 @@ export default function Analytics({
                 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                     <span style={{ fontSize: 12, color: "#6b7280" }}>Q{wq.id} · {wq.concept}</span>
-                    <span style={{ fontSize: 12, color: "#dc2626" }}>{ans.time}s</span>
+                    <span style={{ fontSize: 12, color: "#dc2626" }}>{ans?.time || 0}s</span>
                   </div>
                   <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 6, lineHeight: 1.5 }}>{wq.q}</p>
                   <div style={{ fontSize: 13, lineHeight: 1.5 }}>
-                    <span style={{ color: "#dc2626", textDecoration: "line-through" }}>
-                      Your answer: {wq.opts[ans.selected]}
-                    </span>
-                    <br />
-                    <span style={{ color: "#059669" }}>Correct: {wq.opts[wq.ans]}</span>
+                    {userOption && (
+                      <>
+                        <span style={{ color: "#dc2626", textDecoration: "line-through" }}>
+                          Your answer: {userOption.text}
+                        </span>
+                        <br />
+                      </>
+                    )}
+                    {correctOption && (
+                      <span style={{ color: "#059669" }}>Correct: {correctOption.text}</span>
+                    )}
                   </div>
                 </div>
               );

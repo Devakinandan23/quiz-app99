@@ -81,6 +81,12 @@ export const createAttemptController: RequestHandler = async (req, res, next) =>
       score: result.score,
       accuracy: result.accuracy,
       totalQuestions: result.totalQuestions,
+      responses: result.evaluations.map((e) => ({
+        questionId: e.questionId,
+        optionId: e.optionId,
+        isCorrect: e.isCorrect,
+        correctOptionId: e.correctOptionId,
+      })),
     })
   } catch (error) {
     next(error)

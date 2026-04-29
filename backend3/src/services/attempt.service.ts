@@ -128,6 +128,16 @@ export const submitAttempt = async ({ quizId, responses }: AttemptInput) => {
         score,
         accuracy,
         totalQuestions,
+        evaluations: responses.map((response) => {
+          const question = questionMap.get(response.questionId)!
+          const correctOption = question.options.find((o) => o.isCorrect)!
+          return {
+            questionId: response.questionId,
+            optionId: response.optionId,
+            isCorrect: correctOption.id === response.optionId,
+            correctOptionId: correctOption.id,
+          }
+        }),
       }
     })
 
@@ -207,6 +217,9 @@ export const getAttemptById = async (attemptId: number) => {
             select: {
               question: true,
               explanation: true,
+              concept: true,
+              subject: true,
+              ncert: true,
               options: {
                 orderBy: {
                   id: 'asc',
@@ -214,6 +227,7 @@ export const getAttemptById = async (attemptId: number) => {
                 select: {
                   id: true,
                   text: true,
+                  isCorrect: true,
                 },
               },
             },

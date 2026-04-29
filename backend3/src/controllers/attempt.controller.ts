@@ -87,6 +87,7 @@ export const createAttemptController: RequestHandler = async (req, res, next) =>
         isCorrect: e.isCorrect,
         correctOptionId: e.correctOptionId,
       })),
+      allCorrectOptions: result.allCorrectOptions,
     })
   } catch (error) {
     next(error)

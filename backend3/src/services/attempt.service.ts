@@ -138,6 +138,13 @@ export const submitAttempt = async ({ quizId, responses }: AttemptInput) => {
             correctOptionId: correctOption.id,
           }
         }),
+        // correctOptionId for EVERY question in the quiz (including unanswered)
+        allCorrectOptions: Object.fromEntries(
+          quiz.questions.map((question) => {
+            const correctOption = question.options.find((o) => o.isCorrect)
+            return [question.id, correctOption?.id ?? null]
+          }),
+        ),
       }
     })
 

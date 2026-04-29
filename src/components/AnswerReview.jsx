@@ -132,13 +132,26 @@ export default function AnswerReview({ answers, setScreen }) {
               <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
                 {(q.opts || []).map((opt) => {
                   const isUserPick = opt.id === a.selected;
+                  const isCorrectOpt = opt.id === a.correctOptionId;
+
+                  // Start with neutral style
                   let bg = "#f9fafb";
                   let border = "#e5e5e3";
-                  let color = "#6b7280";
+                  let color = "#374151";
                   let fw = "400";
+                  let radioColor = "#d1d5db";
+                  let radioDotColor = "transparent";
 
-                  if (isUserPick && !a.isCorrect) {
+                  // Always highlight the correct option green
+                  if (isCorrectOpt) {
+                    bg = "#f0fdf4"; border = "#22c55e"; color = "#15803d"; fw = "500";
+                    radioColor = "#22c55e"; radioDotColor = "#22c55e";
+                  }
+
+                  // User's wrong pick — red (overrides neutral, not correct)
+                  if (isUserPick && !a.isCorrect && !a.isUnanswered) {
                     bg = "#fef2f2"; border = "#dc2626"; color = "#dc2626"; fw = "500";
+                    radioColor = "#dc2626"; radioDotColor = "#dc2626";
                   }
 
                   return (
@@ -150,22 +163,26 @@ export default function AnswerReview({ answers, setScreen }) {
                       {/* Radio circle indicator */}
                       <span style={{
                         width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
-                        border: `2px solid ${isUserPick ? "#dc2626" : "#d1d5db"}`,
+                        border: `2px solid ${radioColor}`,
                         display: "flex", alignItems: "center", justifyContent: "center",
                       }}>
-                        {isUserPick && (
+                        {(isUserPick || isCorrectOpt) && (
                           <span style={{
                             width: 10, height: 10, borderRadius: "50%",
-                            background: "#dc2626",
+                            background: radioDotColor,
                           }} />
                         )}
                       </span>
                       <span style={{ flex: 1 }}>{opt.text}</span>
-                      {isUserPick && !a.isCorrect && !a.isUnanswered && (
-                        <span style={{ fontSize: 11, fontWeight: 600, color: "#dc2626" }}>YOUR ANSWER</span>
+                      {/* Labels */}
+                      {isCorrectOpt && isUserPick && a.isCorrect && (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#15803d", letterSpacing: 0.4 }}>✓ YOUR ANSWER</span>
                       )}
-                      {isUserPick && a.isCorrect && (
-                        <span style={{ fontSize: 11, fontWeight: 600, color: "#059669" }}>YOUR ANSWER</span>
+                      {isCorrectOpt && !isUserPick && (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#15803d", letterSpacing: 0.4 }}>CORRECT ANSWER</span>
+                      )}
+                      {isUserPick && !a.isCorrect && !a.isUnanswered && (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#dc2626", letterSpacing: 0.4 }}>YOUR ANSWER</span>
                       )}
                     </div>
                   );

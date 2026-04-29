@@ -205,13 +205,16 @@ export function useQuiz() {
       setQuizDone(true);
       setQuizActive(false);
       
-      // Build a map of questionId -> isCorrect from the backend evaluations
+      // Build a map of questionId -> { isCorrect, correctOptionId } from the backend evaluations
       const responseMap = {};
       if (Array.isArray(result.responses)) {
         result.responses.forEach(r => {
-          responseMap[r.questionId] = r.isCorrect;
+          responseMap[r.questionId] = { isCorrect: r.isCorrect, correctOptionId: r.correctOptionId };
         });
       }
+
+      // allCorrectOptions covers ALL questions (including unanswered) → enables green highlight everywhere
+      const allCorrectOptions = result.allCorrectOptions || {};
 
       setAnswers(
         quizQuestions.map((q, idx) => ({
@@ -222,7 +225,8 @@ export function useQuiz() {
           subject: q.subject || "",
           ncert: q.ncert || false,
           isUnanswered: userAnswers[idx] === undefined,
-          isCorrect: responseMap[q.id] === true,
+          isCorrect: responseMap[q.id]?.isCorrect === true,
+          correctOptionId: allCorrectOptions[q.id] ?? responseMap[q.id]?.correctOptionId ?? null,
           question: q,
         })),
       );
@@ -330,6 +334,7 @@ export function useQuiz() {
           qId: item.questionId,
           selected: item.optionId,
           isCorrect,
+          correctOptionId: correctOption?.id ?? null,
           isUnanswered: false,
           concept: item.question?.concept || "",
           subject: item.question?.subject || "",

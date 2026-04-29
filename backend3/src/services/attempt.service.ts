@@ -163,6 +163,24 @@ export const submitAttempt = async ({ quizId, responses }: AttemptInput) => {
   }
 }
 
+export const deleteAttempt = async (attemptId: number) => {
+  const attempt = await prisma.attempt.findUnique({
+    where: { id: attemptId },
+    select: { id: true },
+  })
+
+  if (!attempt) {
+    throw httpError(404, 'Attempt not found.')
+  }
+
+  await prisma.$transaction([
+    prisma.response.deleteMany({ where: { attemptId } }),
+    prisma.attempt.delete({ where: { id: attemptId } }),
+  ])
+
+  return { deleted: true, attemptId }
+}
+
 export const listAttempts = async ({ limit, offset }: ListAttemptsInput) => {
   const [total, items] = await prisma.$transaction([
     prisma.attempt.count(),

@@ -1,5 +1,6 @@
 import type { RequestHandler } from 'express'
 import {
+  deleteAttempt,
   getAttemptById,
   listAttempts,
   submitAttempt,
@@ -38,9 +39,7 @@ export const createAttemptController: RequestHandler = async (req, res, next) =>
     }
 
     if (!Array.isArray(responses)) {
-      res
-        .status(400)
-        .json({ message: 'responses must be an array of answers.' })
+      res.status(400).json({ message: 'responses must be an array of answers.' })
       return
     }
 
@@ -52,8 +51,7 @@ export const createAttemptController: RequestHandler = async (req, res, next) =>
 
       if (!isPositiveInteger(response?.questionId) || !isPositiveInteger(response?.optionId)) {
         res.status(400).json({
-          message:
-            'Each response must contain positive integer questionId and optionId.',
+          message: 'Each response must contain positive integer questionId and optionId.',
         })
         return
       }
@@ -103,9 +101,7 @@ export const getAttemptsController: RequestHandler = async (req, res, next) => {
     const offset = rawOffset ? Number.parseInt(rawOffset, 10) : 0
 
     if (!Number.isInteger(limit) || limit <= 0 || limit > 500) {
-      res
-        .status(400)
-        .json({ message: 'Invalid limit. Must be an integer between 1 and 500.' })
+      res.status(400).json({ message: 'Invalid limit. Must be an integer between 1 and 500.' })
       return
     }
 
@@ -133,6 +129,23 @@ export const getAttemptByIdController: RequestHandler = async (req, res, next) =
 
     const attempt = await getAttemptById(attemptId)
     res.status(200).json(attempt)
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const deleteAttemptController: RequestHandler = async (req, res, next) => {
+  try {
+    const rawAttemptId = getSingleString(req.params.id)
+    const attemptId = Number.parseInt(rawAttemptId ?? '', 10)
+
+    if (!Number.isInteger(attemptId) || attemptId <= 0) {
+      res.status(400).json({ message: 'Invalid id. Must be a positive integer.' })
+      return
+    }
+
+    const result = await deleteAttempt(attemptId)
+    res.status(200).json(result)
   } catch (error) {
     next(error)
   }

@@ -107,8 +107,13 @@ export function useQuiz() {
     setHistory([]);
   };
 
-  const deleteAttempt = (attemptId) => {
-    setHistory((prev) => prev.filter((item) => item.id !== attemptId));
+  const deleteAttempt = async (attemptId) => {
+    try {
+      await api.deleteAttempt(attemptId);
+      setHistory((prev) => prev.filter((item) => item.id !== attemptId));
+    } catch (error) {
+      console.error("Failed to delete attempt:", error?.message || error);
+    }
   };
 
   const selectQuiz = async (quizId) => {

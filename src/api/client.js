@@ -50,6 +50,7 @@ export const api = {
   getAttempts: ({ limit = 20, offset = 0 } = {}) =>
     request(`/attempts?limit=${limit}&offset=${offset}`),
   getAttemptById: (attemptId) => request(`/attempts/${attemptId}`),
+  deleteAttempt: (attemptId) => request(`/attempts/${attemptId}`, { method: "DELETE" }),
 };
 
 export { ApiError, API_BASE_URL, request };

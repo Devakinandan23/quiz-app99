@@ -1,6 +1,6 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.DEV ? "http://localhost:3000" : "/api");
+  (import.meta.env.DEV ? "http://localhost:3000" : "https://backend3-nr7x.onrender.com");
 
 class ApiError extends Error {
   constructor(message, status, data) {

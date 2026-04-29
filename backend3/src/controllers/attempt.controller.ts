@@ -37,10 +37,10 @@ export const createAttemptController: RequestHandler = async (req, res, next) =>
       return
     }
 
-    if (!Array.isArray(responses) || responses.length === 0) {
+    if (!Array.isArray(responses)) {
       res
         .status(400)
-        .json({ message: 'responses must be a non-empty array of answers.' })
+        .json({ message: 'responses must be an array of answers.' })
       return
     }
 

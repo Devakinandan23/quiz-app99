@@ -187,18 +187,10 @@ export function useQuiz() {
     clearInterval(timerRef.current);
     saveCurrentQuestionTime();
 
-    const unanswered = quizQuestions.filter((_, idx) => userAnswers[idx] === undefined);
-    if (unanswered.length > 0) {
-      setSubmitError(
-        `Please answer all questions before submission. ${unanswered.length} remaining.`,
-      );
-      return;
-    }
-
     const responses = quizQuestions.map((q, idx) => ({
       questionId: q.id,
       optionId: userAnswers[idx],
-    }));
+    })).filter(res => res.optionId !== undefined && res.optionId !== null);
 
     setSubmitLoading(true);
     setSubmitError("");

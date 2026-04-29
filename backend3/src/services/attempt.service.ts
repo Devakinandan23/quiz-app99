@@ -1,5 +1,5 @@
 import { prisma } from '../db.js'
-import { createHash } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 
 type AttemptInput = {
   quizId: number
@@ -26,9 +26,7 @@ export const submitAttempt = async ({ quizId, responses }: AttemptInput) => {
     .map((item) => `${item.questionId}:${item.optionId}`)
     .join('|')
 
-  const submissionHash = createHash('sha256')
-    .update(`${quizId}|${normalizedForHash}`)
-    .digest('hex')
+  const submissionHash = randomUUID()
 
   try {
     const attempt = await prisma.$transaction(async (tx) => {
@@ -59,12 +57,6 @@ export const submitAttempt = async ({ quizId, responses }: AttemptInput) => {
       }
 
       const totalQuestions = quiz.questions.length
-      if (responses.length !== totalQuestions) {
-        throw httpError(
-          400,
-          `Expected ${totalQuestions} responses for a completed submission, received ${responses.length}.`,
-        )
-      }
 
       const questionMap = new Map(
         quiz.questions.map((question) => [question.id, question]),

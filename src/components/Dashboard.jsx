@@ -18,7 +18,9 @@ export default function Dashboard({ startQuiz, activeQuizMeta, goHome, questions
       <div style={S.container}>
         <div style={{ textAlign: "center", marginBottom: 36 }}>
           <h1 style={{ ...S.title, fontSize: 28 }}>{quiz.title}</h1>
-          <p style={S.subtitle}>{quiz.description}</p>
+          {quiz.description && quiz.description !== `${questionCount} questions` && (
+            <p style={S.subtitle}>{quiz.description}</p>
+          )}
           <p style={{ fontSize: 13, color: "#6b7280", marginTop: 6 }}>{questionCount} questions</p>
         </div>
 
